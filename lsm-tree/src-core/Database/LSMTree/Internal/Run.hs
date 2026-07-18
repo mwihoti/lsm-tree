@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingVia           #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -11,7 +12,8 @@
 module Database.LSMTree.Internal.Run (
     -- * Run
     Run (Run, index, hasFS, hasBlockIO, dataCaching,
-         blobFile, bloomFilter, kOpsFile)
+         blobFile, bloomFilter, kOpsFile, fsPaths, numEntries, refCounter)
+
   , RunFsPaths
   , size
   , sizeInPages
@@ -102,10 +104,10 @@ instance Show (Run m h) where
   showsPrec _ run = showString "Run { fsPaths = " . showsPrec 0 run.fsPaths .  showString " }"
 
 instance NFData h => NFData (Run m h) where
-  rnf (Run numEntries refCounter fsPaths bloomFilter index kOpsFile blobFile dataCaching hasFS hasBlockIO) =
-    rnf numEntries `seq` rwhnf refCounter `seq` rnf fsPaths `seq`
-    rnf bloomFilter `seq` rnf index `seq` rnf kOpsFile `seq`
-    rnf blobFile `seq` rnf dataCaching `seq` rwhnf hasFS `seq` rwhnf hasBlockIO
+  rnf r =
+      rnf r.numEntries `seq` rwhnf r.refCounter `seq` rnf r.fsPaths `seq`
+      rnf r.bloomFilter `seq` rnf r.index       `seq` rnf r.kOpsFile `seq`
+      rnf r.blobFile     `seq` rnf r.dataCaching `seq` rwhnf r.hasFS `seq` rwhnf r.hasBlockIO
 
 instance RefCounted m (Run m h) where
     getRefCounter r = r.refCounter

@@ -2,6 +2,9 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | A run that is being read incrementally.
 --
@@ -87,7 +90,7 @@ data RunReader m h = RunReader {
     , kOpsHandle     :: !(FS.Handle h)
       -- | The blob file from the run this reader is reading from.
     , blobFile       :: !(Ref (BlobFile m h))
-    , dataCaching    :: !Run.RunDataCaching
+    , runDataCaching :: !Run.RunDataCaching
     , hasFS          :: !(HasFS m h)
     , hasBlockIO     :: !(HasBlockIO m h)
     }
@@ -105,46 +108,43 @@ new :: forall m h.
   -> Ref (Run.Run m h)
   -> m  (RunReader m h)
 new !offsetKey readerRun@(DeRef run) = do
+
+    let runDataCaching = run.dataCaching
+        hasFS          = run.hasFS
+        hasBlockIO     = run.hasBlockIO
+        index          = run.index
+
     (kOpsHandle :: FS.Handle h) <-
-      FS.hOpen run.hasFS (runKOpsPath (Run.runFsPaths readerRun)) FS.ReadMode >>= \h -> do
-        fileSize <- FS.hGetSize run.hasFS h
+      FS.hOpen hasFS (runKOpsPath (Run.runFsPaths readerRun)) FS.ReadMode >>= \h -> do
+        fileSize <- FS.hGetSize hasFS h
         let fileSizeInPages = fileSize `div` toEnum pageSize
         let indexedPages = getNumPages $ Run.sizeInPages readerRun
         assert (indexedPages == fileSizeInPages) $ pure h
     -- Advise the OS that this file is being read sequentially, which will
     -- double the readahead window in response (only for this file descriptor)
-    FS.hAdviseAll run.hasBlockIO kOpsHandle FS.AdviceSequential
 
-    (page, entryNo) <- seekFirstEntry kOpsHandle
+    FS.hAdviseAll hasBlockIO kOpsHandle FS.AdviceSequential
 
+    (page, entryNo) <- seekFirstEntry hasFS index kOpsHandle
     blobFile <- dupRef run.blobFile
     currentEntryNo <- newPrimVar entryNo
     currentPage <- newMutVar page
-    let reader = RunReader {
-            currentPage = currentPage
-          , currentEntryNo = currentEntryNo
-          , kOpsHandle = kOpsHandle
-          , blobFile = blobFile
-          , dataCaching = run.dataCaching
-          , hasFS = run.hasFS
-          , hasBlockIO = run.hasBlockIO
-          }
-
+    let reader = RunReader {..}
     when (isNothing page) $
       close reader
     pure reader
   where
-    seekFirstEntry readerKOpsHandle =
+    seekFirstEntry hasFS index readerKOpsHandle =
         case offsetKey of
           NoOffsetKey -> do
             -- Load first page from disk, if it exists.
-            firstPage <- readDiskPage run.hasFS readerKOpsHandle
+            firstPage <- readDiskPage hasFS readerKOpsHandle
             pure (firstPage, 0)
           OffsetKey offset -> do
             -- Use the index to find the page number for the key (if it exists).
-            let PageSpan pageNo pageEnd = Index.search offset run.index
-            seekToDiskPage run.hasFS pageNo readerKOpsHandle
-            readDiskPage run.hasFS readerKOpsHandle >>= \case
+            let PageSpan pageNo pageEnd = Index.search offset index
+            seekToDiskPage hasFS pageNo readerKOpsHandle
+            readDiskPage hasFS readerKOpsHandle >>= \case
               Nothing ->
                 pure (Nothing, 0)
               Just foundPage -> do
@@ -163,8 +163,8 @@ new !offsetKey readerRun@(DeRef run) = do
                     -- page and the first key in the next page.
                     -- Thus the reader should be initialised to return keys
                     -- starting from the next (non-overflow) page.
-                    seekToDiskPage run.hasFS (nextPageNo pageEnd) readerKOpsHandle
-                    nextPage <- readDiskPage run.hasFS readerKOpsHandle
+                    seekToDiskPage hasFS (nextPageNo pageEnd) readerKOpsHandle
+                    nextPage <- readDiskPage hasFS readerKOpsHandle
                     pure (nextPage, 0)
 
 {-# SPECIALISE close ::
@@ -177,8 +177,9 @@ close ::
      (MonadSTM m, MonadMask m, PrimMonad m)
   => RunReader m h
   -> m ()
-close r = do
-    when (r.dataCaching == Run.NoCacheRunData) $
+
+close r = do -- Use 'r' instead of RunReader{..}
+    when (r.runDataCaching == Run.NoCacheRunData) $
       -- drop the file from the OS page cache
       FS.hDropCacheAll r.hasBlockIO r.kOpsHandle
     FS.hClose r.hasFS r.kOpsHandle

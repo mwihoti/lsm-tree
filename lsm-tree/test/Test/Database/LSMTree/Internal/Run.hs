@@ -1,3 +1,6 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Database.LSMTree.Internal.Run (
@@ -224,7 +227,7 @@ prop_WriteAndOpen fs hbio wb =
       withRef written $ \written' ->
         withRef loaded $ \loaded' -> do
           written'.bloomFilter @=? loaded'.bloomFilter
-          written'.index       @=? loaded'.index
+          written'.index @=? loaded'.index
 
       writtenKOps <- readKOps Nothing written
       loadedKOps  <- readKOps Nothing loaded
