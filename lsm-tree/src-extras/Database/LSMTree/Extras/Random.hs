@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP          #-}
 
 module Database.LSMTree.Extras.Random (
     -- * Sampling from uniform distributions
@@ -38,8 +39,7 @@ sampleUniformWithoutReplacement :: Ord a => StdGen -> Int -> [a] -> [a]
 sampleUniformWithoutReplacement rng0 n (Set.fromList -> xs0)
   | n > Set.size xs0 =
       error $
-        printf "sampleUniformWithoutReplacement: n > length xs0 for n=%d, \
-               \ length xs0=%d"
+        printf "sampleUniformWithoutReplacement: n > length xs0 for n=%d, length xs0=%d"
                n
                (Set.size xs0)
   | otherwise =
@@ -115,6 +115,13 @@ shuffle xs g =
 -- | Generates a random bytestring. Its length is uniformly distributed within
 -- the provided range.
 randomByteStringR :: (Int, Int) -> StdGen -> (BS.ByteString, StdGen)
+#if MIN_VERSION_random(1,3,0)
 randomByteStringR range g =
     let (!l, !g')  = uniformR range g
     in  R.uniformByteString l g'
+#else
+-- MIN_VERSION_random(1,2,0)
+randomByteStringR range g =
+    let (!l, !g')  = uniformR range g
+    in  R.genByteString l g'
+#endif
