@@ -12,7 +12,12 @@ None
 
 ### Minor changes
 
-* Support `data-elevator-0.3`. See [issue #856](https://github.com/IntersectMBO/lsm-tree/issues/856) and [PR #857](https://github.com/IntersectMBO/lsm-tree/pull/857).
+* Support `data-elevator-0.3`. See [issue
+  #856](https://github.com/IntersectMBO/lsm-tree/issues/856) and [PR
+  #857](https://github.com/IntersectMBO/lsm-tree/pull/857).
+* Support `ghc-9.14`. See [issue
+  #813](https://github.com/IntersectMBO/lsm-tree/issues/813) and [PR
+  #859](https://github.com/IntersectMBO/lsm-tree/pull/859).
 
 ### Bug fixes
 
