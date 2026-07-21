@@ -20,6 +20,7 @@ import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Primitive as VP
 import qualified Data.Vector.Unboxed.Mutable as VUM
 import           Database.LSMTree.Extras.Orphans ()
+import           Database.LSMTree.Extras.Random (uniform_compat)
 import           Database.LSMTree.Extras.UTxO
 import           Database.LSMTree.Internal.Arena (ArenaManager, newArenaManager,
                      withArena)
@@ -404,7 +405,7 @@ genLookupBatch !rng0 !n0
           !res <- V.unsafeFreeze mres
           pure (res, rng)
       | otherwise = do
-          let (!k, !rng') = uniform @UTxOKey @StdGen rng
+          let (!k, !rng') = uniform_compat @UTxOKey @StdGen rng
               !sk = serialiseKey k
           VM.write mres i $! sk
           go rng' (i+1) mres
@@ -548,7 +549,7 @@ vectorOfUniforms !vec !g0 = do
       | i == n-1 = pure g
       | otherwise = do
           when (i .&. 0xFFFF == 0) (unsafeIOToPrim $ putStr ".")
-          let (!x, !g') = uniform g
+          let (!x, !g') = uniform_compat g
           VGM.unsafeWrite vec i x
           loop (i+1) g'
 

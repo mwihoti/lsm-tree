@@ -10,14 +10,15 @@ import qualified Data.List as List
 import           Data.Maybe (fromMaybe, isJust, isNothing)
 import           Data.Word (Word64)
 import           Database.LSMTree.Extras.Orphans ()
-import           Database.LSMTree.Extras.Random (frequency, randomByteStringR)
+import           Database.LSMTree.Extras.Random (frequency, randomByteStringR,
+                     uniform_compat)
 import           Database.LSMTree.Extras.UTxO
 import           Database.LSMTree.Internal.BlobRef (BlobSpan (..))
 import           Database.LSMTree.Internal.Entry
 import           Database.LSMTree.Internal.Serialise
 import           Database.LSMTree.Internal.WriteBuffer (WriteBuffer)
 import qualified Database.LSMTree.Internal.WriteBuffer as WB
-import           System.Random (StdGen, mkStdGen, uniform)
+import           System.Random (StdGen, mkStdGen)
 
 benchmarks :: Benchmark
 benchmarks = bgroup "Bench.Database.LSMTree.Internal.WriteBuffer" [
@@ -168,14 +169,14 @@ defaultConfig = Config {
 
 configWord64 :: Config
 configWord64 = defaultConfig {
-    randomKey    = first serialiseKey . uniform @Word64 @_
-  , randomValue  = first serialiseValue . uniform @Word64 @_
+    randomKey    = first serialiseKey . uniform_compat @Word64 @_
+  , randomValue  = first serialiseValue . uniform_compat @Word64 @_
   }
 
 configUTxO :: Config
 configUTxO = defaultConfig {
-    randomKey    = first serialiseKey . uniform @UTxOKey @_
-  , randomValue  = first serialiseValue . uniform @UTxOValue @_
+    randomKey    = first serialiseKey . uniform_compat @UTxOKey @_
+  , randomValue  = first serialiseValue . uniform_compat @UTxOValue @_
   }
 
 envInputKOps :: Config -> InputKOps
@@ -219,6 +220,6 @@ randomKOps Config {..} = take nentries . List.unfoldr (Just . randomKOp) .
 
 randomBlobSpan :: Rnd BlobSpan
 randomBlobSpan !g =
-  let (off, !g')  = uniform g
-      (len, !g'') = uniform g'
+  let (off, !g')  = uniform_compat g
+      (len, !g'') = uniform_compat g'
   in (BlobSpan off len, g'')
