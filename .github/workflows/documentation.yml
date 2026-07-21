@@ -33,6 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
+    # We want this job to run on the merge queue, but we can't do that
+    # without also running it on PRs (limitation of GHA). However, we can skip the
+    # job on PRs using a conditional, which counts as a success to GHA.
+    if: ${{ github.event_name != 'pull_request' }}
+
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v7
@@ -97,8 +102,11 @@ jobs:
   publish-documentation:
     name: Publish documentation
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+
     needs: [build]
+
+    # We only publish the documentation when pushing to the main branch
+    if: ${{ github.event_name == 'push' }}
 
     permissions:
       pages: write
