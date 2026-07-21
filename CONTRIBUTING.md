@@ -103,6 +103,13 @@ The following are requirements for merging a PR into `main`:
 * PRs should be approved by at least 1 code owner.
 * The PR should pass all CI checks.
 
+## CI
+
+To avoid unnecessary power and resource consumption, we have a tiered CI. On
+pull requests, we provide fast feedback with a small set of jobs. In the merge
+queue and when pushing to main we run a larger set of jobs to ensure we test
+extensively and to make sure we get good caching behaviour.
+
 ## Releases
 
 Releases follow the [Haskell Package Versioning

@@ -19,13 +19,121 @@ defaults:
   run:
     shell: sh
 
-# Set the default GHC and Cabal versions.
+# Set the GHC and Cabal versions for linter jobs.
 env:
-  DEFAULT_GHC_VERSION: "9.6"
-  DEFAULT_CABAL_VERSION: "3.12"
-  DEFAULT_CABAL_PROJECT_FILE: "cabal.project.debug"
+  LINT_GHC_VERSION: "9.6"
+  LINT_CABAL_VERSION: "3.12"
+  LINT_CABAL_PROJECT_FILE: "cabal.project.debug"
 
 jobs:
+  ################################################################################
+  # Setup matrix
+  ################################################################################
+  setup-matrix:
+    name: "Build: Setup matrix"
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 5
+
+    outputs:
+      matrix: ${{ steps.setup-matrix.outputs.matrix }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # NOTE: For caching purposes, the matrix combinations that we test on pull
+    # requests (PR) should be a subset of the matrix combinations we run on the
+    # merge queue and main (MQ, push to main).
+    - name: 🛠️ Setup matrix (PR)
+      if: ${{ github.event_name == 'pull_request' }}
+      run: |
+        { echo 'MATRIX_COMBINATIONS<<EOF'
+          # Default CI: PR
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo EOF
+        } >> "$GITHUB_ENV"
+
+    - name: 🛠️ Setup matrix (MQ, push to main)
+      if: ${{ github.event_name != 'pull_request' }}
+      run: |
+        { echo 'MATRIX_COMBINATIONS<<EOF'
+          # Default CI: PR
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          # Comprehensive CI: MQ, push to main
+          ## Test every GHC version on Ubuntu
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.2",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.4",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.8",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.10", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.12", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "ubuntu-latest",  "ghc-version": "9.14", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          ## Test every GHC version on MacOS
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.2",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.4",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.8",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.10", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.12", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "macos-latest",   "ghc-version": "9.14", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          ## Test every GHC version on Windows
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.2",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.4",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.8",  "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.10", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.12", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "", "os": "windows-latest", "ghc-version": "9.14", "cabal-version": "3.12", "cabal-flags": "", "cabal-project-file": "cabal.project.debug"},'
+          ## Various special cases
+          echo '{"name" : "Build with +serialblockio"       , "os": "ubuntu-latest", "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "+serialblockio", "cabal-project-file": "cabal.project.debug"},'
+          echo '{"name" : "Build with cabal.project.release", "os": "ubuntu-latest", "ghc-version": "9.6", "cabal-version": "3.12", "cabal-flags": "",               "cabal-project-file": "cabal.project.release"},'
+          echo EOF
+        } >> "$GITHUB_ENV"
+
+    - name: 🛠️ Setup matrix
+      id: setup-matrix
+      run: |
+        echo $MATRIX_COMBINATIONS
+        MATRIX="{\"include\":[$MATRIX_COMBINATIONS]}"
+        echo $MATRIX
+        {
+          echo 'MATRIX<<EOF'
+          echo "$MATRIX"
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+
+  ################################################################################
+  # Check success
+  ################################################################################
+  check-success:
+    name: "Build: Check success"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    needs:
+    - build
+
+    defaults:
+      run:
+        shell: bash
+
+    if: ${{ !cancelled() }}
+
+    steps:
+    - name: 🧪 Report failure
+      if: ${{ needs.build.result == 'failure' }}
+      run: |
+        echo "Some jobs failed"
+        exit 1
+
+    - name: 🧪 Report success
+      if: ${{ needs.build.result == 'success'  }}
+      run: |
+        echo "All jobs succeeded"
+        exit 0
+
   ################################################################################
   # Build
   ################################################################################
@@ -42,6 +150,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
 
+    needs:
+    - setup-matrix
+
+    strategy:
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
+      fail-fast: false
+
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v7
@@ -49,10 +164,10 @@ jobs:
     - name: 🗄️ Print Job info
       run: |
         echo 'matrix.os: ${{ matrix.os }}'
-        echo 'matrix.ghc-version: ${{ matrix.ghc-version || env.DEFAULT_GHC_VERSION }}'
-        echo 'matrix.cabal-version: ${{ matrix.os || env.DEFAULT_CABAL_VERSION }}'
+        echo 'matrix.ghc-version: ${{ matrix.ghc-version }}'
+        echo 'matrix.cabal-version: ${{ matrix.os }}'
         echo 'matrix.cabal-flags: ${{ matrix.cabal-flags }}'
-        echo 'matrix.cabal-project-file: ${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}'
+        echo 'matrix.cabal-project-file: ${{ matrix.cabal-project-file }}'
         echo 'toJSON(matrix): ${{ toJSON(matrix) }}'
 
     - name: 🗄️ Print CPU info
@@ -62,8 +177,8 @@ jobs:
       id: setup-haskell
       uses:  haskell-actions/setup@v2
       with:
-        ghc-version: ${{ matrix.ghc-version || env.DEFAULT_GHC_VERSION }}
-        cabal-version: ${{ matrix.cabal-version || env.DEFAULT_CABAL_VERSION }}
+        ghc-version: ${{ matrix.ghc-version }}
+        cabal-version: ${{ matrix.cabal-version }}
 
     - name: 🛠️ Setup system dependencies (Linux)
       if: ${{ runner.os == 'Linux' }}
@@ -74,18 +189,18 @@ jobs:
     - name: 🛠️ Configure
       run: |
         cabal configure \
-          --project-file="${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}" \
+          --project-file="${{ matrix.cabal-project-file }}" \
           --enable-tests \
           --enable-benchmarks \
           --disable-documentation \
           --ghc-options="-Werror" \
           --flag="${{ matrix.cabal-flags }}"
-        cat "${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}.local"
+        cat "${{ matrix.cabal-project-file }}.local"
 
     - name: 💾 Generate Cabal plan
       run: |
         cabal build all \
-          --project-file="${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}" \
+          --project-file="${{ matrix.cabal-project-file }}" \
           --dry-run
 
     - name: 💾 Restore Cabal dependencies
@@ -102,7 +217,7 @@ jobs:
     - name: 🛠️ Build Cabal dependencies
       run: |
         cabal build all \
-          --project-file="${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}" \
+          --project-file="${{ matrix.cabal-project-file }}" \
           --only-dependencies
 
     - name: 💾 Save Cabal dependencies
@@ -115,7 +230,7 @@ jobs:
     - name: 🏗️ Build
       run: |
         cabal build all \
-          --project-file="${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}"
+          --project-file="${{ matrix.cabal-project-file }}"
 
     - name: 🧪 Test
       id: test
@@ -123,7 +238,7 @@ jobs:
         cabal test all \
           -j1 \
           --test-show-details=direct \
-          --project-file="${{ matrix.cabal-project-file || env.DEFAULT_CABAL_PROJECT_FILE }}"
+          --project-file="${{ matrix.cabal-project-file }}"
       env:
         TASTY_TIMEOUT: "5m"
 
@@ -149,26 +264,6 @@ jobs:
       run: ./scripts/test-cabal-docspec.sh
       env:
         SKIP_CABAL_BUILD: true
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest", "macOS-latest", "windows-latest"]
-        ghc-version: ["9.2", "9.4", "9.6", "9.8", "9.10", "9.12", "9.14"]
-        cabal-version: ["3.12"]
-        # The inclusion of these default keys in the matrix ensures that any
-        # entry under include that assigns these keys creates a new matrix entry
-        cabal-flags: [""]
-        cabal-project-file: [""]
-
-        include:
-          # Include builds for various special cases
-          - name: "Build with +serialblockio"
-            os: "ubuntu-latest"
-            cabal-flags: "+serialblockio"
-          - name: "Build with cabal.project.release"
-            os: "ubuntu-latest"
-            cabal-project-file: "cabal.project.release"
 
   ################################################################################
   # Lint with actionlint
@@ -202,8 +297,8 @@ jobs:
       uses: ./.github/actions/setup-cabal-fmt
       with:
         cabal-fmt-version: "0.1.12"
-        ghc-version: ${{ env.DEFAULT_GHC_VERSION }}
-        cabal-version: ${{ env.DEFAULT_CABAL_VERSION }}
+        ghc-version: ${{ env.LINT_GHC_VERSION }}
+        cabal-version: ${{ env.LINT_CABAL_VERSION }}
         # The index-state is fixed to enable caching and ensure that the version
         # regardless of the current state of Hackage head.
         # If you want a newer version of cabal-fmt, use a more recent time.
@@ -226,8 +321,8 @@ jobs:
       id: setup-haskell
       uses:  haskell-actions/setup@v2
       with:
-        ghc-version: ${{ env.DEFAULT_GHC_VERSION }}
-        cabal-version: ${{ env.DEFAULT_CABAL_VERSION }}
+        ghc-version: ${{ env.LINT_GHC_VERSION }}
+        cabal-version: ${{ env.LINT_CABAL_VERSION }}
         cabal-update: false
 
     - name: 🎗️ Lint with cabal
@@ -248,7 +343,7 @@ jobs:
       with:
         stylish-haskell-version: "0.15.1.0"
         ghc-version: "9.10"
-        cabal-version: ${{ env.DEFAULT_CABAL_VERSION }}
+        cabal-version: ${{ env.LINT_CABAL_VERSION }}
         # The index-state is fixed to enable caching and ensure that the version
         # regardless of the current state of Hackage head.
         # If you want a newer version of stylish-haskell, use a more recent time.
@@ -283,8 +378,8 @@ jobs:
     - name: 🛠️ Generate README.md
       uses: ./.github/actions/generate-readme
       with:
-        ghc-version: ${{ env.DEFAULT_GHC_VERSION }}
-        cabal-version: ${{ env.DEFAULT_CABAL_VERSION }}
+        ghc-version: ${{ env.LINT_GHC_VERSION }}
+        cabal-version: ${{ env.LINT_CABAL_VERSION }}
         hackage-index-state: "2025-05-22T00:00:00Z"
 
     - name: 🎗️ Lint with generate-readme
