@@ -78,3 +78,29 @@
     lhs: "Test.QuickCheck.withMaxSuccess"
     rhs: "withNumTests_compat"
 - ignore: { name: "Use withNumTests_compat", within: "Test.Util.QC.Compat" }
+
+### splitGen compatibility
+- error:
+    name: "Use splitGen_compat"
+    lhs: "System.Random.splitGen"
+    rhs: "splitGen_compat"
+- error:
+    name: "Use splitGen_compat"
+    lhs: "System.Random.Stateful.splitGen"
+    rhs: "splitGen_compat"
+- error:
+    name: "Use splitGen_compat"
+    lhs: "System.Random.split"
+    rhs: "splitGen_compat"
+- error:
+    name: "Use splitGen_compat"
+    lhs: "System.Random.Stateful.split"
+    rhs: "splitGen_compat"
+- ignore: { name: "Use splitGen_compat", within: "Database.LSMTree.Extras.Random" }
+
+### uniform compatibility
+- error:
+    name: "Use uniform_compat"
+    lhs: "System.Random.uniform"
+    rhs: "uniform_compat"
+- ignore: { name: "Use uniform_compat", within: "Database.LSMTree.Extras.Random" }

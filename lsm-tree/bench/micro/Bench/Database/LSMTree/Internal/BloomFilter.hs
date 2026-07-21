@@ -57,8 +57,8 @@ elemEnv ::
   -> IO (Bloom SerialisedKey, [SerialisedKey])
 elemEnv fpr nbloom nelemsPositive nelemsNegative = do
     let g = mkStdGen 100
-        (g1, g') = R.splitGen g
-        (g2, g3) = R.splitGen g'
+        (g1, g') = splitGen_compat g
+        (g2, g3) = splitGen_compat g'
 
     let (xs, ys1) = splitAt nbloom
                   $ uniformWithoutReplacement    @UTxOKey g1  (nbloom + nelemsNegative)

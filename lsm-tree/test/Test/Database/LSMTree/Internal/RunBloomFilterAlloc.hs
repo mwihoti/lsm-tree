@@ -36,7 +36,7 @@ import           Database.LSMTree.Extras.Random
 import qualified Database.LSMTree.Internal.Entry as LSMT
 import           Database.LSMTree.Internal.RunAcc (RunBloomFilterAlloc (..),
                      newMBloom)
-import           System.Random hiding (Seed)
+import           System.Random (StdGen, Uniform, mkStdGen)
 import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck

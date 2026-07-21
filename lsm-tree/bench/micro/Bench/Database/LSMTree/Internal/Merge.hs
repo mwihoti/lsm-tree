@@ -36,8 +36,7 @@ import qualified System.FS.BlockIO.API as FS
 import qualified System.FS.BlockIO.IO as FS
 import qualified System.FS.IO as FS
 import           System.IO.Temp
-import qualified System.Random as R
-import           System.Random (StdGen, mkStdGen, uniform, uniformR)
+import           System.Random (StdGen, mkStdGen, uniformR)
 
 benchmarks :: Benchmark
 benchmarks = bgroup "Bench.Database.LSMTree.Internal.Merge" [
@@ -345,22 +344,22 @@ defaultConfig = Config {
 
 configWord64 :: Config
 configWord64 = defaultConfig {
-    randomKey    = first serialiseKey . uniform @Word64 @_
-  , randomValue  = first serialiseValue . uniform @Word64 @_
+    randomKey    = first serialiseKey . R.uniform_compat @Word64 @_
+  , randomValue  = first serialiseValue . R.uniform_compat @Word64 @_
   , randomBlob   = first serialiseBlob . R.randomByteStringR (0, 0x2000)  -- up to 8 kB
   }
 
 configUTxO :: Config
 configUTxO = defaultConfig {
-    randomKey    = first serialiseKey . uniform @UTxOKey @_
-  , randomValue  = first serialiseValue . uniform @UTxOValue @_
+    randomKey    = first serialiseKey . R.uniform_compat @UTxOKey @_
+  , randomValue  = first serialiseValue . R.uniform_compat @UTxOValue @_
   }
 
 configUTxOStaking :: Config
 configUTxOStaking = defaultConfig {
     fmupserts    = 1
-  , randomKey    = first serialiseKey . uniform @UTxOKey @_
-  , randomValue  = first serialiseValue . uniform @Word64 @_
+  , randomKey    = first serialiseKey . R.uniform_compat @UTxOKey @_
+  , randomValue  = first serialiseValue . R.uniform_compat @Word64 @_
   , mergeResolve = Just (onDeserialisedValues ((+) @Word64))
   }
 
@@ -410,7 +409,7 @@ randomRuns hasFS hasBlockIO refCtx config@Config {..} rng0 = do
         zipWith
           (randomRunData config)
           nentries
-          (List.unfoldr (Just . R.splitGen) rng0)
+          (List.unfoldr (Just . R.splitGen_compat) rng0)
 
 -- | Generate keys and entries to insert into the write buffer.
 -- They are already serialised to exclude the cost from the benchmark.
@@ -425,7 +424,7 @@ randomRunData Config {..} runentries g0 =
       (R.withoutReplacement g1 runentries randomKey)
       (R.withReplacement g2 runentries randomEntry)
   where
-    (g1, g2) = R.splitGen g0
+    (g1, g2) = R.splitGen_compat g0
 
     randomEntry :: Rnd (Entry SerialisedValue SerialisedBlob)
     randomEntry = R.frequency

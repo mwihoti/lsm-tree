@@ -79,6 +79,7 @@ import           Database.LSMTree.Extras (groupsOfN)
 -- We should be able to write this benchmark
 -- using only use public lsm-tree interface
 import qualified Database.LSMTree as LSM
+import qualified Database.LSMTree.Extras.Random as Random
 
 -------------------------------------------------------------------------------
 -- Table configuration
@@ -114,13 +115,13 @@ makeKey seed =
     case P.runPrimArray $ do
            v <- P.newPrimArray 5
            let g0 = Random.mkStdGen (fromIntegral seed)
-           let (!w0, !g1) = Random.uniform g0
+           let (!w0, !g1) = Random.uniform_compat g0
            P.writePrimArray v 0 w0
-           let (!w1, !g2) = Random.uniform g1
+           let (!w1, !g2) = Random.uniform_compat g1
            P.writePrimArray v 1 w1
-           let (!w2, !g3) = Random.uniform g2
+           let (!w2, !g3) = Random.uniform_compat g2
            P.writePrimArray v 2 w2
-           let (!w3, _g4) = Random.uniform g3
+           let (!w3, _g4) = Random.uniform_compat g3
            P.writePrimArray v 3 w3
            P.writePrimArray v 4 0x3d3d3d3d3d3d3d3d -- ========
            case v of

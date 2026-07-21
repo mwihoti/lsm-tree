@@ -15,6 +15,9 @@ module Database.LSMTree.Extras.Random (
   , shuffle
     -- * Generators for specific data types
   , randomByteStringR
+    -- * Compatibility
+  , splitGen_compat
+  , uniform_compat
   ) where
 
 import qualified Data.ByteString as BS
@@ -22,7 +25,7 @@ import           Data.List (sortBy, unfoldr)
 import           Data.Ord (comparing)
 import qualified Data.Set as Set
 import qualified System.Random as R
-import           System.Random (StdGen, Uniform, uniform, uniformR)
+import           System.Random (StdGen, Uniform, uniformR)
 import           Text.Printf (printf)
 
 {-------------------------------------------------------------------------------
@@ -30,10 +33,10 @@ import           Text.Printf (printf)
 -------------------------------------------------------------------------------}
 
 uniformWithoutReplacement :: (Ord a, Uniform a) => StdGen -> Int -> [a]
-uniformWithoutReplacement rng n = withoutReplacement rng n uniform
+uniformWithoutReplacement rng n = withoutReplacement rng n uniform_compat
 
 uniformWithReplacement :: Uniform a => StdGen -> Int -> [a]
-uniformWithReplacement rng n = withReplacement rng n uniform
+uniformWithReplacement rng n = withReplacement rng n uniform_compat
 
 sampleUniformWithoutReplacement :: Ord a => StdGen -> Int -> [a] -> [a]
 sampleUniformWithoutReplacement rng0 n (Set.fromList -> xs0)
@@ -125,3 +128,29 @@ randomByteStringR range g =
     let (!l, !g')  = uniformR range g
     in  R.genByteString l g'
 #endif
+
+{-------------------------------------------------------------------------------
+  Compatibility
+-------------------------------------------------------------------------------}
+
+-- | Alternative to @splitGen@ that is also compatible with versions of
+-- random<1.3
+--
+-- Uses @split@ on @random<1.3@, and @splitGen@ on @random>=1.3@. The former
+-- function is deprecated on @random>=1.3@.
+splitGen_compat :: StdGen -> (StdGen, StdGen)
+#if MIN_VERSION_random(1,3,0)
+splitGen_compat = R.splitGen
+#else
+splitGen_compat = R.split
+#endif
+
+-- | Alternative to @uniform@ that is also compatible with versions of
+-- random<1.3
+--
+-- The order of type variables is different on random<1.3 and random>=1.3. This
+-- is inconvenient for type application, so we use this compatibility function
+-- to ensure that the type variables always have the same ordering.
+uniform_compat :: (Uniform a, R.RandomGen g) => g -> (a, g)
+uniform_compat = R.uniform
+

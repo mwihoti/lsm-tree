@@ -17,6 +17,7 @@ import           Data.Word
 import           Database.LSMTree hiding (withTable)
 import           Database.LSMTree.Extras
 import           Database.LSMTree.Extras.Orphans ()
+import           Database.LSMTree.Extras.Random (uniform_compat)
 import           Database.LSMTree.Internal.Assertions (fromIntegralChecked)
 import qualified Database.LSMTree.Internal.RawBytes as RB
 import           GHC.Generics (Generic)
@@ -116,7 +117,7 @@ benchLargeValueVsSmallValueBlob =
 
       customRandomEntries :: Int -> V.Vector (K, Word64, ShortByteString)
       customRandomEntries n = V.unfoldrExactN n f (mkStdGen 17)
-        where f !g = let (!k, !g') = uniform g
+        where f !g = let (!k, !g') = uniform_compat g
                     in  ((k, v, b), g')
               -- The exact value does not matter much, so we pick an arbitrary
               -- hardcoded one.
@@ -207,7 +208,7 @@ benchCursorScanVsRangeLookupScan =
 
       customRandomEntries :: Int -> V.Vector (K, V2, Maybe B2)
       customRandomEntries n = V.unfoldrExactN n f (mkStdGen 17)
-        where f !g = let (!k, !g') = uniform g
+        where f !g = let (!k, !g') = uniform_compat g
                     in  ((k, v, Nothing), g')
               -- The exact value does not matter much, so we pick an arbitrary
               -- hardcoded one.
@@ -257,7 +258,7 @@ benchInsertBatches =
 
       randomInserts :: Int -> V.Vector (K, V2, Maybe Void)
       randomInserts n = V.unfoldrExactN n f (mkStdGen 17)
-        where f !g = let (!k, !g') = uniform g
+        where f !g = let (!k, !g') = uniform_compat g
                     in  ((k, v, Nothing), g')
               -- The exact value does not matter much, so we pick an arbitrary
               -- hardcoded one.
@@ -414,7 +415,7 @@ benchLookupInsertsVsLookupUpserts =
 -- | Random keys, default values @1@
 randomEntries :: Int -> V.Vector (K, V3)
 randomEntries n = V.unfoldrExactN n f (mkStdGen 17)
-  where f !g = let (!k, !g') = uniform g
+  where f !g = let (!k, !g') = uniform_compat g
                in  ((k, 1), g')
 
 -- | Like 'randomEntries', but also returns groups of size 'm'

@@ -159,13 +159,13 @@ makeKey seed =
     case P.runPrimArray $ do
            v <- P.newPrimArray 5
            let g0 = Random.mkStdGen (fromIntegral seed)
-           let (!w0, !g1) = Random.uniform g0
+           let (!w0, !g1) = Random.uniform_compat g0
            P.writePrimArray v 0 w0
-           let (!w1, !g2) = Random.uniform g1
+           let (!w1, !g2) = Random.uniform_compat g1
            P.writePrimArray v 1 w1
-           let (!w2, !g3) = Random.uniform g2
+           let (!w2, !g3) = Random.uniform_compat g2
            P.writePrimArray v 2 w2
-           let (!w3, _g4) = Random.uniform g3
+           let (!w3, _g4) = Random.uniform_compat g3
            P.writePrimArray v 3 w3
            P.writePrimArray v 4 0x3d3d3d3d3d3d3d3d -- ========
            case v of
@@ -461,7 +461,7 @@ deriveSetupRNGs :: GlobalOpts -> Int -> NonEmpty Random.StdGen
 deriveSetupRNGs gOpts amount =
     let  -- g1 is reserved for the run command
         (_g1, !g2) = deriveInitialForkedRNGs gOpts
-    in  NE.fromList $ take amount $ List.unfoldr (Just . Random.splitGen) g2
+    in  NE.fromList $ take amount $ List.unfoldr (Just . Random.splitGen_compat) g2
 
 deriveRunRNG :: GlobalOpts -> Random.StdGen
 deriveRunRNG gOpts =
@@ -470,7 +470,7 @@ deriveRunRNG gOpts =
     in  g1
 
 deriveInitialForkedRNGs :: GlobalOpts -> (Random.StdGen, Random.StdGen)
-deriveInitialForkedRNGs = Random.splitGen . Random.mkStdGen . seed
+deriveInitialForkedRNGs = Random.splitGen_compat . Random.mkStdGen . seed
 
 -------------------------------------------------------------------------------
 -- Batch generation

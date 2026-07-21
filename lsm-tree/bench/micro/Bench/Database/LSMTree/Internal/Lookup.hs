@@ -16,8 +16,8 @@ import           Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 import           Database.LSMTree.Extras.Orphans ()
 import           Database.LSMTree.Extras.Random (frequency, randomByteStringR,
-                     sampleUniformWithReplacement, shuffle,
-                     uniformWithoutReplacement)
+                     sampleUniformWithReplacement, shuffle, splitGen_compat,
+                     uniformWithoutReplacement, uniform_compat)
 import           Database.LSMTree.Extras.UTxO
 import           Database.LSMTree.Internal.Arena (ArenaManager, closeArena,
                      newArena, newArenaManager, withArena)
@@ -248,9 +248,9 @@ lookupsEnv ::
         , V.Vector SerialisedKey
         )
 lookupsEnv g nentries npos nneg = do
-    let  (g1, g')  = R.splitGen g
-         (g2, g'') = R.splitGen g'
-         (g3, g4)  = R.splitGen g''
+    let  (g1, g')  = splitGen_compat g
+         (g2, g'') = splitGen_compat g'
+         (g3, g4)  = splitGen_compat g''
     let (keys, negLookups) = splitAt nentries
                            $ uniformWithoutReplacement @UTxOKey g1 (nentries + nneg)
         posLookups         = sampleUniformWithReplacement g2 npos keys
@@ -267,14 +267,14 @@ lookupsEnv g nentries npos nneg = do
 
 randomEntry :: StdGen -> (Entry UTxOValue ByteString, StdGen)
 randomEntry g = frequency [
-      (20, \g' -> let (!v, !g'') = uniform g' in (Insert v, g''))
-    , (1,  \g' -> let (!v, !g'') = uniform g'
+      (20, \g' -> let (!v, !g'') = uniform_compat g' in (Insert v, g''))
+    , (1,  \g' -> let (!v, !g'') = uniform_compat g'
                       -- The size of the blobs doesn't matter for the benchmark,
                       -- as it only deals with the blob references. So we make
                       -- them tiny to not slow down the setup.
                       (!b, !g''') = randomByteStringR (0, 100) g''
                   in  (InsertWithBlob v b, g'''))
-    , (2,  \g' -> let (!v, !g'') = uniform g' in (Upsert v, g''))
+    , (2,  \g' -> let (!v, !g'') = uniform_compat g' in (Upsert v, g''))
     , (2,  \g' -> (Delete, g'))
     ] g
 

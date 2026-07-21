@@ -18,6 +18,8 @@ None
 * Support `ghc-9.14`. See [issue
   #813](https://github.com/IntersectMBO/lsm-tree/issues/813) and [PR
   #859](https://github.com/IntersectMBO/lsm-tree/pull/859).
+* Drop support for `random < 1.2`. See [PR
+  #865](https://github.com/IntersectMBO/lsm-tree/pull/865).
 
 ### Bug fixes
 

@@ -24,6 +24,8 @@ import           System.Random
 import           Text.Printf (printf)
 
 import           Database.LSMTree.Extras.Orphans ()
+import           Database.LSMTree.Extras.Random (splitGen_compat,
+                     uniform_compat)
 import           Database.LSMTree.Internal.Assertions (fromIntegralChecked)
 import qualified Database.LSMTree.Internal.BloomFilter as Bloom
 import           Database.LSMTree.Internal.Serialise (SerialisedKey,
@@ -236,7 +238,7 @@ elemManyEnv filterSizes rng0 =
          when (i .&. 0xFFFF == 0) (unsafeIOToST $ putStr ".")
          -- insert n elements into filter b
          let k :: Word256
-             (!k, !rng') = uniform rng
+             (!k, !rng') = uniform_compat rng
          Bloom.insert mb (serialiseKey k)
          pure rng'
       )
@@ -257,9 +259,9 @@ benchInBatches !b !rng0 !action =
     go !rng !n
       | n <= 0    = ()
       | otherwise =
-        let (!rng'', !rng') = splitGen rng
+        let (!rng'', !rng') = splitGen_compat rng
             ks  :: VP.Vector Word256
-            !ks  = VP.unfoldrExactN b uniform rng'
+            !ks  = VP.unfoldrExactN b uniform_compat rng'
             ks' :: V.Vector SerialisedKey
             !ks' = V.map serialiseKey (V.convert ks)
         in action ks' `seq` go rng'' (n-b)
