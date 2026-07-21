@@ -123,9 +123,10 @@ jobs:
 
     steps:
     - name: 🧪 Report failure
-      if: ${{ needs.build.result == 'failure' }}
+      if: ${{ needs.build.result != 'success' }}
       run: |
         echo "Some jobs failed"
+        echo "Result status: ${{ needs.build.result }}"
         exit 1
 
     - name: 🧪 Report success
