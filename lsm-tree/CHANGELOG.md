@@ -1,6 +1,6 @@
 # Revision history for `lsm-tree`
 
-## ?.?.?.? -- ????-??-??
+## 1.1.1.0 -- 2026-07-21
 
 ### Breaking changes
 
