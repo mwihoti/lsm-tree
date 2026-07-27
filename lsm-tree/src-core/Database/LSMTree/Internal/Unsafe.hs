@@ -1916,7 +1916,7 @@ listSnapshots sesh = do
 -- | A snapshot was intended to be imported, but the source directory does not
 -- exist.
 newtype SnapshotImportDirDoesNotExistError
-    = SnapshotImportDirDoesNotExistError FsErrorPath
+    = ErrSnapshotImportDirDoesNotExist FsErrorPath
     deriving stock (Show, Eq)
     deriving anyclass (Exception)
 
@@ -1950,7 +1950,7 @@ importSnapshot sesh snap (maybeSourceFS, sourcePath) = do
         sourceExists <- FS.doesDirectoryExist hfs sourcePath
         unless sourceExists $ do
           let sourceErrorPath = maybe (FS.mkFsErrorPath hfs) FS.mkFsErrorPath maybeSourceFS $ sourcePath
-          throwIO (SnapshotImportDirDoesNotExistError sourceErrorPath)
+          throwIO (ErrSnapshotImportDirDoesNotExist sourceErrorPath)
 
         -- we assume the snapshots directory already exists, so we just have
         -- to create the directory for this specific snapshot.
@@ -1976,7 +1976,7 @@ importSnapshot sesh snap (maybeSourceFS, sourcePath) = do
 -- | A snapshot was intended to be exported, but the destination directory
 -- already exists.
 newtype SnapshotExportDirExistsError
-    = SnapshotExportDirExistsError FsErrorPath
+    = ErrSnapshotExportDirExists FsErrorPath
     deriving stock (Show, Eq)
     deriving anyclass (Exception)
 
@@ -2009,7 +2009,7 @@ exportSnapshot sesh snap (maybeDestinationFS, destinationPath) = do
         destinationExists <- FS.doesDirectoryExist hfs destinationPath
         when destinationExists $ do
           let destinationErrorPath = maybe (FS.mkFsErrorPath hfs) FS.mkFsErrorPath maybeDestinationFS $ destinationPath
-          throwIO (SnapshotExportDirExistsError destinationErrorPath)
+          throwIO (ErrSnapshotExportDirExists destinationErrorPath)
 
         withRollback_ reg
           (FS.createDirectoryIfMissing hfs True destinationPath)

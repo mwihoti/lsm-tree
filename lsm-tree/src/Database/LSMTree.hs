@@ -3050,7 +3050,7 @@ exportSnapshotIO session snapshotName exportDir = do
   --       directory, which, it is fair to assume, exists.
   when (null exportRelDir) $ do
     let exportFsErrorPath = FsErrorPath (Just mountPoint) exportDirFsPath
-    throwIO $ SnapshotExportDirExistsError exportFsErrorPath
+    throwIO $ ErrSnapshotExportDirExists exportFsErrorPath
 
   -- Export the snapshot.
   exportSnapshot session snapshotName (Just (ioHasFS @IO mountPoint), exportDirFsPath)

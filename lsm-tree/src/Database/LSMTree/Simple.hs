@@ -1707,7 +1707,7 @@ _convertTableUnionNotCompatibleError sessionDirFor =
 
 -- | A snapshot was intended to be imported, but the source directory does not exist.
 newtype SnapshotImportDirDoesNotExistError
-    = SnapshotImportDirDoesNotExistError FilePath
+    = ErrSnapshotImportDirDoesNotExist FilePath
     deriving stock (Show, Eq)
     deriving anyclass (Exception)
 
@@ -1721,8 +1721,8 @@ _convertSnapshotImportDirDoesNotExistError ::
     IO a
 _convertSnapshotImportDirDoesNotExistError =
     mapExceptionWithActionRegistry $ \case
-        LSMT.SnapshotImportDirDoesNotExistError fsErrorPath ->
-            SnapshotImportDirDoesNotExistError (show fsErrorPath)
+        LSMT.ErrSnapshotImportDirDoesNotExist fsErrorPath ->
+            ErrSnapshotImportDirDoesNotExist (show fsErrorPath)
 
 
 -- | A snapshot was intended to be exported, but the destination directory already exists.
@@ -1742,5 +1742,5 @@ _convertSnapshotExportDirExistsError ::
     IO a
 _convertSnapshotExportDirExistsError =
     mapExceptionWithActionRegistry $ \case
-        LSMT.SnapshotExportDirExistsError fsErrorPath ->
-            SnapshotExportDirExistsError (show fsErrorPath)
+        LSMT.ErrSnapshotImportDirDoesNotExist fsErrorPath ->
+            ErrSnapshotImportDirDoesNotExist (show fsErrorPath)
