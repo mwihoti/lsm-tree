@@ -103,7 +103,9 @@ module Database.LSMTree (
   deleteSnapshot,
   listSnapshots,
   importSnapshot,
+  importSnapshotIO,
   exportSnapshot,
+  exportSnapshotIO,
   SnapshotName,
   isValidSnapshotName,
   toSnapshotName,
@@ -202,6 +204,7 @@ import           Control.Concurrent.Class.MonadMVar.Strict (MonadMVar)
 import           Control.Concurrent.Class.MonadSTM (MonadSTM (STM))
 import           Control.DeepSeq (NFData (..))
 import           Control.Exception.Base (assert)
+import           Control.Monad (when)
 import           Control.Monad.Class.MonadAsync (MonadAsync)
 import           Control.Monad.Class.MonadST (MonadST)
 import           Control.Monad.Class.MonadThrow (MonadCatch (..), MonadEvaluate,
@@ -263,10 +266,13 @@ import           Database.LSMTree.Internal.Unsafe (BlobRefInvalidError (..),
                      UnionCredits (..), UnionDebt (..))
 import qualified Database.LSMTree.Internal.Unsafe as Internal
 import           Prelude hiding (lookup, take, takeWhile)
-import           System.FS.API (FsPath, HasFS (..), MountPoint (..), mkFsPath)
+import qualified System.Directory as Dir
+import qualified System.FilePath as FP
+import           System.FS.API (FsErrorPath (..), FsPath, HasFS (..),
+                     MountPoint (..), mkFsPath)
 import           System.FS.BlockIO.API (HasBlockIO (..))
 import           System.FS.BlockIO.IO (defaultIOCtxParams, withIOHasBlockIO)
-import           System.FS.IO (HandleIO)
+import           System.FS.IO (HandleIO, ioHasFS)
 import           System.Random (randomIO)
 
 --------------------------------------------------------------------------------
@@ -429,11 +435,9 @@ If the interaces are instantiated with the real file system, then the root is an
 In this case, the root is also called the /mount point/ of the interface.
 If the interfaces are instantiated with a simulation, then the root is some abstract location.
 
-Any 'FsPath' paths used with the session after the session is created are also interpreted
-with respect to the root of these interfaces.
-'importSnapshot' and 'exportSnapshot' are currently the only two functions that take
-'FsPaths' as arguments.
-'FsPath's are subject to a number of constraints, which are mentioned in its Haddock documentation.
+If the 'FsPath' argument to 'importSnapshot' or 'exportSnapshot' is passed without the optional
+'HasFS' instance, these 'FsPath' paths are interpreted with respected to the 'HasFS' instance
+that was passed to /this/ function.
 
 If there are no open tables or cursors when the session terminates, then the disk I\/O complexity of this operation is \(O(1)\).
 Otherwise, 'closeTable' is called for each open table and 'closeCursor' is called for each open cursor.
@@ -2944,6 +2948,26 @@ importSnapshot (Session session) =
     Internal.importSnapshot session
 
 {- |
+Variant of 'importSnapshot' that is specialised to 'IO' using the real filesystem.
+-}
+importSnapshotIO ::
+    Session IO ->
+    SnapshotName ->
+    FilePath ->
+    IO ()
+importSnapshotIO session snapshotName importDir = do
+  -- Get the absolute path to the export directory.
+  exportAbsDir <- Dir.makeAbsolute importDir
+
+  -- Split the path to the export directory to determine a suitable mount point.
+  let (mountPointPath, importRelDir) = FP.splitFileName exportAbsDir
+  let mountPoint = MountPoint mountPointPath
+  let importDirFsPath = mkFsPath [importRelDir]
+
+  -- Import the snapshot.
+  importSnapshot session snapshotName (Just (ioHasFS @IO mountPoint), importDirFsPath)
+
+{- |
 Export a snapshot to an external directory.
 
 If the destination directory is on a different filesystem from the session
@@ -3004,6 +3028,32 @@ exportSnapshot ::
   m ()
 exportSnapshot (Session session) =
     Internal.exportSnapshot session
+
+{- |
+Variant of 'exportSnapshot' that is specialised to 'IO' using the real filesystem.
+-}
+exportSnapshotIO ::
+    Session IO ->
+    SnapshotName ->
+    FilePath ->
+    IO ()
+exportSnapshotIO session snapshotName exportDir = do
+  -- Get the absolute path to the export directory.
+  exportAbsDir <- Dir.makeAbsolute exportDir
+
+  -- Split the path to the export directory to determine a suitable mount point.
+  let (mountPointPath, exportRelDir) = FP.splitFileName exportAbsDir
+  let mountPoint = MountPoint mountPointPath
+  let exportDirFsPath = mkFsPath [exportRelDir]
+
+  -- NOTE: If exportRelDir is null, then exportAbsDir must be the root
+  --       directory, which, it is fair to assume, exists.
+  when (null exportRelDir) $ do
+    let exportFsErrorPath = FsErrorPath (Just mountPoint) exportDirFsPath
+    throwIO $ SnapshotExportDirExistsError exportFsErrorPath
+
+  -- Export the snapshot.
+  exportSnapshot session snapshotName (Just (ioHasFS @IO mountPoint), exportDirFsPath)
 
 -- | Internal helper. Get 'resolveSerialised' at type 'ResolveSerialisedValue'.
 _getResolveSerialisedValue ::
