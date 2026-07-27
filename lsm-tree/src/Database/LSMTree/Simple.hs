@@ -88,6 +88,8 @@ module Database.LSMTree.Simple (
     doesSnapshotExist,
     deleteSnapshot,
     listSnapshots,
+    importSnapshot,
+    exportSnapshot,
     SnapshotName,
     isValidSnapshotName,
     toSnapshotName,
@@ -150,6 +152,8 @@ module Database.LSMTree.Simple (
     SnapshotDoesNotExistError (..),
     SnapshotCorruptedError (..),
     SnapshotNotCompatibleError (..),
+    SnapshotImportDirDoesNotExistError (..),
+    SnapshotExportDirExistsError (..),
     CursorClosedError (..),
     InvalidSnapshotNameError (..),
 ) where
@@ -1560,6 +1564,62 @@ listSnapshots ::
 listSnapshots (Session session) =
     LSMT.listSnapshots session
 
+{- |
+Import a snapshot from an external directory.
+
+If the source directory is on a different filesystem from the session
+directory, it should be passed as a pair of the `HasFS` instance for that
+filesystem and an `FsPath`. If the source directory is on the same
+filesystem as the session directory, the `HasFS` instance may be omitted.
+
+The source directory should exist.
+
+The worst-case disk I\/O complexity of this operation is \(O(\frac{n}{P})\).
+
+Throws the following exceptions:
+
+['SessionClosedError']:
+    If the session is closed.
+['SnapshotExistsError']:
+    If a snapshot with the same name already exists.
+['SnapshotImportDirDoesNotExistError']:
+    If the source directory for the to-be-imported snapshot does not exist.
+-}
+importSnapshot ::
+    Session ->
+    SnapshotName ->
+    FilePath ->
+    IO ()
+importSnapshot (Session session) snapshotName importDir =
+  _convertSnapshotImportDirDoesNotExistError $
+    LSMT.importSnapshotIO session snapshotName importDir
+
+
+{- |
+Export a snapshot to a directory.
+
+The destination directory should not already exist.
+
+The worst-case disk I\/O complexity of this operation is \(O(\frac{n}{P})\).
+
+Throws the following exceptions:
+
+['SessionClosedError']:
+    If the session is closed.
+['SnapshotDoesNotExistError']:
+    If no snapshot with the given name exists.
+['SnapshotExportDirExistsError']:
+    If the destination directory for the to-be-exported snapshot already exists.
+-}
+exportSnapshot ::
+    Session ->
+    SnapshotName ->
+    FilePath ->
+    IO ()
+exportSnapshot (Session session) snapshotName exportDir =
+  _convertSnapshotExportDirExistsError $
+    LSMT.exportSnapshotIO session snapshotName exportDir
+
 --------------------------------------------------------------------------------
 -- Errors
 --------------------------------------------------------------------------------
@@ -1640,3 +1700,47 @@ _convertTableUnionNotCompatibleError sessionDirFor =
             ErrTableUnionHandleTypeMismatch i1 typeRep1 i2 typeRep2
         LSMT.ErrTableUnionSessionMismatch i1 _fsErrorPath1 i2 _fsErrorPath2 ->
             ErrTableUnionSessionMismatch i1 (sessionDirFor i1) i2 (sessionDirFor i2)
+
+{-------------------------------------------------------------------------------
+   Snapshot import/export
+-------------------------------------------------------------------------------}
+
+-- | A snapshot was intended to be imported, but the source directory does not exist.
+newtype SnapshotImportDirDoesNotExistError
+    = SnapshotImportDirDoesNotExistError FilePath
+    deriving stock (Show, Eq)
+    deriving anyclass (Exception)
+
+{- | Internal helper. Convert:
+
+*   t'LSMT.SnapshotImportDirDoesNotExistError' to t'SnapshotImportDirDoesNotExistError';
+-}
+_convertSnapshotImportDirDoesNotExistError ::
+    forall a.
+    IO a ->
+    IO a
+_convertSnapshotImportDirDoesNotExistError =
+    mapExceptionWithActionRegistry $ \case
+        LSMT.SnapshotImportDirDoesNotExistError fsErrorPath ->
+            SnapshotImportDirDoesNotExistError (show fsErrorPath)
+
+
+-- | A snapshot was intended to be exported, but the destination directory already exists.
+newtype SnapshotExportDirExistsError
+    = SnapshotExportDirExistsError FilePath
+    deriving stock (Show, Eq)
+    deriving anyclass (Exception)
+
+
+{- | Internal helper. Convert:
+
+*   t'LSMT.SnapshotExportDirExistsError' to t'SnapshotExportDirExistsError';
+-}
+_convertSnapshotExportDirExistsError ::
+    forall a.
+    IO a ->
+    IO a
+_convertSnapshotExportDirExistsError =
+    mapExceptionWithActionRegistry $ \case
+        LSMT.SnapshotExportDirExistsError fsErrorPath ->
+            SnapshotExportDirExistsError (show fsErrorPath)
