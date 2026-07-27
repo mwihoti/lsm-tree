@@ -2884,24 +2884,12 @@ listSnapshots (Session session) =
 {- |
 Import a snapshot from an external directory.
 
+If the source directory is on a different filesystem from the session
+directory, it should be passed as a pair of the `HasFS` instance for that
+filesystem and an `FsPath`. If the source directory is on the same
+filesystem as the session directory, the `HasFS` instance may be omitted.
+
 The source directory should exist.
-Snapshots should only be imported from a directory on the same volume as the session directory.
-
-Importing does not not check whether the external directory is a snapshot, and
-neither does importing verify the snapshot contents if it is a snapshot.
-Open the snapshot to verify that it is a snapshot and that it is not corrupted.
-
-The 'FsPath' path to the source directory is a relative path that is interpreted
-relative to a /root/ (sometimes also called a mount point).
-What the root is depends on which function was used to create the session.
-See 'withOpenSession', 'withOpenSessionIO', and 'withOpenMountedSessionIO' for more
-information about the root.
-
-It is generally not advisable to use 'importSnapshot' and 'exportSnapshot' when the session is
-created using 'withOpenSessionIO'.
-Snapshots should only be exported to somewhere /outside/ the session directory, which is not possible
-when the session is created using 'withOpenSessionIO'.
-Use 'withOpenMountedSessionIO' or 'withOpenSession' instead.
 
 >>> :{
 runExample $ \session table -> do
@@ -2911,8 +2899,8 @@ runExample $ \session table -> do
   LSMT.saveSnapshot "example" "Key Value Blob" table
   -- Export then import snapshot
   let exportDir = mkFsPath ["export"]
-  LSMT.exportSnapshot session "example" exportDir
-  LSMT.importSnapshot session "example_new" exportDir
+  LSMT.exportSnapshot session "example" (Nothing, exportDir)
+  LSMT.importSnapshot session "example_new" (Nothing, exportDir)
   -- Open the imported snapshot
   LSMT.withTableFromSnapshot @_ @_ @Value
     session "example_new" "Key Value Blob" $ \table' -> do
@@ -2940,16 +2928,17 @@ Throws the following exceptions:
   importSnapshot ::
     Session IO ->
     SnapshotName ->
-    FsPath ->
+    (Maybe (HasFS IO h), FsPath) ->
     IO ()
   #-}
 importSnapshot ::
-  forall m.
+  forall m h.
   (IOLike m) =>
   Session m ->
   SnapshotName ->
-  -- | Source directory
-  FsPath ->
+  -- | The source directory and optionally a 'HasFS' instance,
+  --   if the source directory is on a different filesystem.
+  (Maybe (HasFS m h), FsPath) ->
   m ()
 importSnapshot (Session session) =
     Internal.importSnapshot session
@@ -2957,20 +2946,12 @@ importSnapshot (Session session) =
 {- |
 Export a snapshot to an external directory.
 
-The destination directory should not exist already.
-Snapshots should only be exported to a directory on the same volume as the session directory.
+If the destination directory is on a different filesystem from the session
+directory, it should be passed as a pair of the `HasFS` instance for that
+filesystem and an `FsPath`. If the destination directory is on the same
+filesystem as the session directory, the `HasFS` instance may be omitted.
 
-The 'FsPath' path to the destination directory is a relative path that is interpreted
-relative to a /root/.
-What the root is depends on which function was used to create the session.
-See 'withOpenSession', 'withOpenSessionIO', and 'withOpenMountedSessionIO' for more
-information about the root.
-
-It is generally not advisable to use 'importSnapshot' and 'exportSnapshot' when the session is
-created using 'withOpenSessionIO'.
-Snapshots should only be exported to somewhere /outside/ the session directory, which is not possible
-when the session is created using 'withOpenSessionIO'.
-Use 'withOpenMountedSessionIO' or 'withOpenSession' instead.
+The destination directory should not already exist.
 
 >>> :{
 runExample $ \session table -> do
@@ -2980,8 +2961,8 @@ runExample $ \session table -> do
   LSMT.saveSnapshot "example" "Key Value Blob" table
   -- Export then import snapshot
   let exportDir = mkFsPath ["export"]
-  LSMT.exportSnapshot session "example" exportDir
-  LSMT.importSnapshot session "example_new" exportDir
+  LSMT.exportSnapshot session "example" (Nothing, exportDir)
+  LSMT.importSnapshot session "example_new" (Nothing, exportDir)
   -- Open the imported snapshot
   LSMT.withTableFromSnapshot @_ @_ @Value
     session "example_new" "Key Value Blob" $ \table' -> do
@@ -3009,16 +2990,17 @@ Throws the following exceptions:
   exportSnapshot ::
     Session IO ->
     SnapshotName ->
-    FsPath ->
+    (Maybe (HasFS IO h), FsPath) ->
     IO ()
   #-}
 exportSnapshot ::
-  forall m.
+  forall m h.
   (IOLike m) =>
   Session m ->
   SnapshotName ->
-  -- | Destination directory
-  FsPath ->
+  -- | The destination directory and optionally a 'HasFS' instance,
+  --   if the destination directory is on a different filesystem.
+  (Maybe (HasFS m h), FsPath) ->
   m ()
 exportSnapshot (Session session) =
     Internal.exportSnapshot session
