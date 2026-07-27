@@ -1923,16 +1923,17 @@ newtype SnapshotImportDirDoesNotExistError
 {-# SPECIALISE importSnapshot ::
      Session IO h
   -> SnapshotName
-  -> FsPath
+  -> (Maybe (HasFS IO h), FsPath)
   -> IO () #-}
 -- |  See 'Database.LSMTree.importSnapshot'.
 importSnapshot ::
+  forall m h h'.
      (MonadMask m, MonadSTM m, PrimMonad m)
   => Session m h
   -> SnapshotName
-  -> FsPath
+  -> (Maybe (HasFS m h'), FsPath)
   -> m ()
-importSnapshot sesh snap sourcePath = do
+importSnapshot sesh snap (maybeSourceFS, sourcePath) = do
     traceWith sesh.sessionTracer $ TraceImportSnapshot snap sourcePath
     withKeepSessionOpen sesh $ \seshEnv ->
       withActionRegistry $ \reg -> do
@@ -1947,8 +1948,9 @@ importSnapshot sesh snap sourcePath = do
         let destinationPath = Paths.getNamedSnapshotDir snapDir
 
         sourceExists <- FS.doesDirectoryExist hfs sourcePath
-        unless sourceExists $
-          throwIO $ SnapshotImportDirDoesNotExistError $ FS.mkFsErrorPath hfs sourcePath
+        unless sourceExists $ do
+          let sourceErrorPath = maybe (FS.mkFsErrorPath hfs) FS.mkFsErrorPath maybeSourceFS $ sourcePath
+          throwIO (SnapshotImportDirDoesNotExistError sourceErrorPath)
 
         -- we assume the snapshots directory already exists, so we just have
         -- to create the directory for this specific snapshot.
@@ -1956,8 +1958,12 @@ importSnapshot sesh snap sourcePath = do
           (FS.createDirectory hfs destinationPath)
           (FS.removeDirectoryRecursive hfs destinationPath)
 
-        -- create hard links for all files in the destination directory
-        FS.hardLinkDirectoryRecursive hfs hbio reg sourcePath destinationPath
+        -- import the files for the snapshot, either by hard linking or copying
+        case maybeSourceFS of
+          Nothing ->
+            FS.hardLinkOrCopyDirectoryRecursive hfs (Left hbio) reg sourcePath destinationPath
+          Just sourceFS ->
+            FS.hardLinkOrCopyDirectoryRecursive sourceFS (Right hfs) reg sourcePath destinationPath
 
         -- Make the destination directory and its contents durable
         FS.synchroniseDirectoryRecursive hfs hbio destinationPath
@@ -1977,16 +1983,16 @@ newtype SnapshotExportDirExistsError
 {-# SPECIALISE exportSnapshot ::
      Session IO h
   -> SnapshotName
-  -> FsPath
+  -> (Maybe (HasFS IO h'), FsPath)
   -> IO () #-}
 -- |  See 'Database.LSMTree.exportSnapshot'.
 exportSnapshot ::
      (MonadMask m, MonadSTM m, PrimMonad m)
   => Session m h
   -> SnapshotName
-  -> FsPath
+  -> (Maybe (HasFS m h'), FsPath)
   -> m ()
-exportSnapshot sesh snap destinationPath = do
+exportSnapshot sesh snap (maybeDestinationFS, destinationPath) = do
     traceWith (sessionTracer sesh) $ TraceExportSnapshot snap destinationPath
     withKeepSessionOpen sesh $ \seshEnv ->
       withActionRegistry $ \reg -> do
@@ -2001,15 +2007,20 @@ exportSnapshot sesh snap destinationPath = do
         let sourcePath = Paths.getNamedSnapshotDir snapDir
 
         destinationExists <- FS.doesDirectoryExist hfs destinationPath
-        when destinationExists $
-          throwIO $ SnapshotExportDirExistsError $ FS.mkFsErrorPath hfs destinationPath
+        when destinationExists $ do
+          let destinationErrorPath = maybe (FS.mkFsErrorPath hfs) FS.mkFsErrorPath maybeDestinationFS $ destinationPath
+          throwIO (SnapshotExportDirExistsError destinationErrorPath)
 
         withRollback_ reg
           (FS.createDirectoryIfMissing hfs True destinationPath)
           (FS.removeDirectoryRecursive hfs destinationPath)
 
-        -- Create hard links for all files in the destination directory
-        FS.hardLinkDirectoryRecursive hfs hbio reg sourcePath destinationPath
+        -- export the files for the snapshot, either by hard linking or copying
+        case maybeDestinationFS of
+          Nothing ->
+            FS.hardLinkOrCopyDirectoryRecursive hfs (Left hbio) reg sourcePath destinationPath
+          Just destinationFS ->
+            FS.hardLinkOrCopyDirectoryRecursive hfs (Right destinationFS) reg sourcePath destinationPath
 
         -- Make the directory and its contents durable.
         FS.synchroniseDirectoryRecursive hfs hbio destinationPath
