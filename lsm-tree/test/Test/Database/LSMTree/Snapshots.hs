@@ -67,8 +67,8 @@ prop_exportImportSnapshot ins los =
           saveSnapshot "snap1" "KeyValueBlob" table1
 
           -- Export then re-import the snapshot
-          exportSnapshot session "snap1" exportDir
-          importSnapshot session "snap2" exportDir
+          exportSnapshot session "snap1" (Nothing, exportDir)
+          importSnapshot session "snap2" (Nothing, exportDir)
 
           -- Open a table from the re-imported snapshot. Any corruption of the
           -- snapshot would be identified here.
