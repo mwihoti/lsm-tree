@@ -102,6 +102,7 @@ module Database.LSMTree (
   doesSnapshotExist,
   deleteSnapshot,
   listSnapshots,
+  SnapshotMode (..),
   importSnapshot,
   importSnapshotIO,
   exportSnapshot,
@@ -259,7 +260,7 @@ import           Database.LSMTree.Internal.Unsafe (BlobRefInvalidError (..),
                      SessionTrace (..), SnapshotCorruptedError (..),
                      SnapshotDoesNotExistError (..), SnapshotExistsError (..),
                      SnapshotExportDirExistsError (..),
-                     SnapshotImportDirDoesNotExistError (..),
+                     SnapshotImportDirDoesNotExistError (..), SnapshotMode (..),
                      SnapshotNotCompatibleError (..), TableClosedError (..),
                      TableCorruptedError (..), TableTooLargeError (..),
                      TableTrace, TableUnionNotCompatibleError (..),
@@ -435,8 +436,8 @@ If the interaces are instantiated with the real file system, then the root is an
 In this case, the root is also called the /mount point/ of the interface.
 If the interfaces are instantiated with a simulation, then the root is some abstract location.
 
-If the 'FsPath' argument to 'importSnapshot' or 'exportSnapshot' is passed without the optional
-'HasFS' instance, these 'FsPath' paths are interpreted with respected to the interface root.
+If 'importSnapshot' or 'exportSnapshot' are passed the 'SnapshotMode' 'HardLink',
+the 'FsPath' path is interpreted with respect to the interface root.
 
 If there are no open tables or cursors when the session terminates, then the disk I\/O complexity of this operation is \(O(1)\).
 Otherwise, 'closeTable' is called for each open table and 'closeCursor' is called for each open cursor.
@@ -491,9 +492,9 @@ withOpenSession tracer hasFS hasBlockIO sessionSalt sessionDir action = do
 Variant of 'withOpenSession' that is specialised to 'IO' using the real filesystem.
 
 __Warning:__ When using this function, the interface root becomes the session
-directory itself. If `importSnapshot`/`exportSnapshot` are used with an `FsPath`
-/without/ an `HasFS` instance, the `FsPath` is interpreted relative to the session
-directory, which may interfere with database operation.
+directory itself. If 'importSnapshot' or 'exportSnapshot' are passed the
+'SnapshotMode' 'HardLink', the 'FsPath' path is interpreted with relative to the
+session directory, which may interfere with database operations.
 -}
 withOpenSessionIO ::
   Tracer IO LSMTreeTrace ->
@@ -507,12 +508,8 @@ withOpenSessionIO tracer sessionDir action =
 {- |
 Variant of 'withOpenSession' that is specialised to 'IO' using the real filesystem.
 
-The session directory is an 'FsPath' path that is interpreted relative to the given mount point.
-Any 'FsPath' paths used with the session after the session is created are also interpreted
-with respect to the mount point.
-'importSnapshot' and 'exportSnapshot' are currently the only two functions that take
-'FsPath's as arguments.
-'FsPath's are subject to a number of constraints, which are mentioned in its haddock documentation.
+If 'importSnapshot' or 'exportSnapshot' are passed the 'SnapshotMode' 'HardLink',
+the 'FsPath' path is interpreted with respect to the interface root.
 -}
 withOpenMountedSessionIO ::
   Tracer IO LSMTreeTrace ->
@@ -2892,12 +2889,12 @@ listSnapshots (Session session) =
 {- |
 Import a snapshot from an external directory.
 
-If the source directory is on a different filesystem from the session
-directory, it should be passed as a pair of the `HasFS` instance for that
-filesystem and an `FsPath`. In this case, the snapshot is always imported
-by copying. If the source directory is on the same filesystem as the session
-directory, the `HasFS` instance may be omitted. In this case, the snapshot
-is imported by hard linking, only falling back to copying if that fails.
+The 'SnapshotMode' argument determines whether the snapshot is imported
+by hard linking or copying. If the 'SnapshotMode' is @'HardLink' fallback@,
+the 'FsPath' is interpreted relative to the interface root. The @fallback@
+flag determines whether the import should fall back to copying if hard linking
+fails. If the 'SnapshotMode' is @'Copy' extFS@, the 'FsPath' is interpreted
+relative to the root of the @extFS@ 'HasFS' interface.
 
 Importing does not that whether the external directory is a valid shnapshot.
 Open the imported snapshot to verify that it is a valid and uncorrupted.
@@ -2912,8 +2909,8 @@ runExample $ \session table -> do
   LSMT.saveSnapshot "example" "Key Value Blob" table
   -- Export then import snapshot
   let exportDir = mkFsPath ["export"]
-  LSMT.exportSnapshot session "example" (Nothing, exportDir)
-  LSMT.importSnapshot session "example_new" (Nothing, exportDir)
+  LSMT.exportSnapshot session "example" (HardLink True) exportDir
+  LSMT.importSnapshot session "example_new" (HardLink True) exportDir
   -- Open the imported snapshot
   LSMT.withTableFromSnapshot @_ @_ @Value
     session "example_new" "Key Value Blob" $ \table' -> do
@@ -2941,7 +2938,8 @@ Throws the following exceptions:
   importSnapshot ::
     Session IO ->
     SnapshotName ->
-    (Maybe (HasFS IO h), FsPath) ->
+    SnapshotMode IO h ->
+    FsPath ->
     IO ()
   #-}
 importSnapshot ::
@@ -2949,9 +2947,8 @@ importSnapshot ::
   (IOLike m) =>
   Session m ->
   SnapshotName ->
-  -- | The source directory and optionally a 'HasFS' instance,
-  --   if the source directory is on a different filesystem.
-  (Maybe (HasFS m h), FsPath) ->
+  SnapshotMode m h ->
+  FsPath ->
   m ()
 importSnapshot (Session session) =
     Internal.importSnapshot session
@@ -2976,18 +2973,17 @@ importSnapshotIO session snapshotName importDir = do
   let importDirFsPath = mkFsPath [importRelDir]
 
   -- Import the snapshot.
-  importSnapshot session snapshotName (Just (ioHasFS @IO mountPoint), importDirFsPath)
+  importSnapshot session snapshotName (Copy (ioHasFS @IO mountPoint)) importDirFsPath
 
 {- |
 Export a snapshot to an external directory.
 
-If the destination directory is on a different filesystem from the session
-directory, it should be passed as a pair of the `HasFS` instance for that
-filesystem and an `FsPath`. In this case, the snapshot is always exported
-by copying. If the destination directory is on the same filesystem as the
-session directory, the `HasFS` instance may be omitted. In this case, the
-snapshot is exported by hard linking, falling back to copying only if that
-fails.
+The 'SnapshotMode' argument determines whether the snapshot is exported
+by hard linking or copying. If the 'SnapshotMode' is @'HardLink' fallback@,
+the 'FsPath' is interpreted relative to the interface root. The @fallback@
+flag determines whether the import should fall back to copying if hard linking
+fails. If the 'SnapshotMode' is @'Copy' extFS@, the 'FsPath' is interpreted
+relative to the root of the @extFS@ 'HasFS' interface.
 
 The destination directory should not already exist.
 
@@ -3028,7 +3024,8 @@ Throws the following exceptions:
   exportSnapshot ::
     Session IO ->
     SnapshotName ->
-    (Maybe (HasFS IO h), FsPath) ->
+    SnapshotMode IO h ->
+    FsPath ->
     IO ()
   #-}
 exportSnapshot ::
@@ -3036,9 +3033,8 @@ exportSnapshot ::
   (IOLike m) =>
   Session m ->
   SnapshotName ->
-  -- | The destination directory and optionally a 'HasFS' instance,
-  --   if the destination directory is on a different filesystem.
-  (Maybe (HasFS m h), FsPath) ->
+  SnapshotMode m h ->
+  FsPath ->
   m ()
 exportSnapshot (Session session) =
     Internal.exportSnapshot session
@@ -3069,7 +3065,7 @@ exportSnapshotIO session snapshotName exportDir = do
     throwIO $ ErrSnapshotExportDirExists exportFsErrorPath
 
   -- Export the snapshot.
-  exportSnapshot session snapshotName (Just (ioHasFS @IO mountPoint), exportDirFsPath)
+  exportSnapshot session snapshotName (Copy (ioHasFS @IO mountPoint)) exportDirFsPath
 
 -- | Internal helper. Get 'resolveSerialised' at type 'ResolveSerialisedValue'.
 _getResolveSerialisedValue ::

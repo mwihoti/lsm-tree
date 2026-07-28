@@ -5,6 +5,7 @@ module Database.LSMTree.Internal.FS (
     -- * Copy file
   , copyFile
     -- * Hard links with fallback
+  , Mode (..)
   , hardLinkOrCopyDirectoryRecursive
   ) where
 
@@ -144,10 +145,24 @@ copyFile' sourceFS destinationFS reg sourcePath destinationPath =
   Hard link with fallback
 -------------------------------------------------------------------------------}
 
+{- |
+The file transfer mode to be used by a snapshot import or export.
+-}
+data Mode m h
+  = HardLink
+    -- | Whether or not to allow fallback to copying.
+    !Bool
+    -- | The 'HasBlockIO' instance that enables hard linking.
+    !(HasBlockIO m h)
+  | forall h'.
+    Copy
+    -- | The 'HasFS' instance that enables copying.
+    !(HasFS m h')
+
 {-# SPECIALISE
   hardLinkOrCopy ::
        HasFS IO h
-    -> Either (HasBlockIO IO h) (HasFS IO h')
+    -> Mode IO h
     -> ActionRegistry IO
     -> FS.FsPath
     -> FS.FsPath
@@ -162,32 +177,32 @@ hardLinkOrCopy ::
      HasFS m h
   -> -- | Either a 'HasBlockIO' instance for the source filesystem,
      --   or a 'HasFS' instance for the destination filesystem
-     Either (HasBlockIO m h) (HasFS m h')
+     Mode m h
   -> ActionRegistry m
   -> FS.FsPath         -- ^ The source path
   -> FS.FsPath         -- ^ The destination path
   -> m ()
-hardLinkOrCopy sourceFS (Left sourceBIO) reg sourcePath destinationPath = do
+hardLinkOrCopy sourceFS (HardLink fallback sourceBIO) reg sourcePath destinationPath = do
   let -- NOTE: On Windows, the error code is ERROR_NOT_SAME_DEVICE (17),
       --       but the Win32 primitive for creating hard links maps this
       --       to the POSIX error code EXDEV using the maperrno builtin.
       isEXDEV :: FsError -> Bool
       isEXDEV e = fsErrorNo e == Just eXDEV
+      ifEXDEV e = if isEXDEV e then Just e else Nothing
 
-  -- Try to create a hard link from @sourcePath@ to @destinationPath@, but
-  -- if a cross-device link error is encountered, fall back to copying.
-  catchJust
-    (\e -> if isEXDEV e then Just e else Nothing)
-    (hardLink sourceFS sourceBIO reg sourcePath destinationPath)
-    (\_e_EXDEV -> copyFile sourceFS reg sourcePath destinationPath)
+      doHardLink = hardLink sourceFS sourceBIO reg sourcePath destinationPath
+      doFallBack = copyFile sourceFS reg sourcePath destinationPath
+      doHardLinkThenFallBack = catchJust ifEXDEV doHardLink (const doFallBack)
 
-hardLinkOrCopy sourceFS (Right destinationFS) reg sourcePath destinationPath =
+  if fallback then doHardLinkThenFallBack else doHardLink
+
+hardLinkOrCopy sourceFS (Copy destinationFS) reg sourcePath destinationPath =
   copyFile' sourceFS destinationFS reg sourcePath destinationPath
 
 {-# SPECIALISE
   hardLinkOrCopyDirectoryRecursive ::
        HasFS IO h
-    -> Either (HasBlockIO IO h) (HasFS IO h')
+    -> Mode IO h
     -> ActionRegistry IO
     -> FS.FsPath
     -> FS.FsPath
@@ -199,25 +214,25 @@ hardLinkOrCopyDirectoryRecursive ::
      HasFS m h
   -> -- | Either a 'HasBlockIO' instance for the source filesystem,
      --   or a 'HasFS' instance for the destination filesystem
-     Either (HasBlockIO m h) (HasFS m h')
+     Mode m h
   -> ActionRegistry m
      -- | Source path
   -> FS.FsPath
      -- | Destination path
   -> FS.FsPath
   -> m ()
-hardLinkOrCopyDirectoryRecursive sourceFS hbioOrDestinationFS reg sourcePath destinationPath = do
+hardLinkOrCopyDirectoryRecursive sourceFS mode reg sourcePath destinationPath = do
   entries <- FS.listDirectory sourceFS sourcePath
   forM_ entries $ \entry -> do
     let sourcePath' = sourcePath FS.</> FS.mkFsPath [entry]
         destinationPath' = destinationPath FS.</> FS.mkFsPath [entry]
     isFile <- FS.doesFileExist sourceFS sourcePath'
     if isFile then
-      hardLinkOrCopy sourceFS hbioOrDestinationFS reg sourcePath' destinationPath'
+      hardLinkOrCopy sourceFS mode reg sourcePath' destinationPath'
     else do
       isDirectory <- FS.doesDirectoryExist sourceFS sourcePath'
       if isDirectory then do
-        hardLinkOrCopyDirectoryRecursive sourceFS hbioOrDestinationFS reg sourcePath' destinationPath'
+        hardLinkOrCopyDirectoryRecursive sourceFS mode reg sourcePath' destinationPath'
       else
         error $ printf
           "hardLinkOrCopyDirectoryRecursive: %s is not a file or directory"
