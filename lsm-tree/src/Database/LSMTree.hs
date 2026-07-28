@@ -2890,8 +2890,10 @@ Import a snapshot from an external directory.
 
 If the source directory is on a different filesystem from the session
 directory, it should be passed as a pair of the `HasFS` instance for that
-filesystem and an `FsPath`. If the source directory is on the same
-filesystem as the session directory, the `HasFS` instance may be omitted.
+filesystem and an `FsPath`. In this case, the snapshot is always imported
+by copying. If the source directory is on the same filesystem as the session
+directory, the `HasFS` instance may be omitted. In this case, the snapshot
+is imported by hard linking, only falling back to copying if that fails.
 
 The source directory should exist.
 
@@ -2949,6 +2951,8 @@ importSnapshot (Session session) =
 
 {- |
 Variant of 'importSnapshot' that is specialised to 'IO' using the real filesystem.
+
+This always imports the snapshot by copying.
 -}
 importSnapshotIO ::
     Session IO ->
@@ -2972,8 +2976,11 @@ Export a snapshot to an external directory.
 
 If the destination directory is on a different filesystem from the session
 directory, it should be passed as a pair of the `HasFS` instance for that
-filesystem and an `FsPath`. If the destination directory is on the same
-filesystem as the session directory, the `HasFS` instance may be omitted.
+filesystem and an `FsPath`. In this case, the snapshot is always exported
+by copying. If the destination directory is on the same filesystem as the
+session directory, the `HasFS` instance may be omitted. In this case, the
+snapshot is exported by hard linking, falling back to copying only if that
+fails.
 
 The destination directory should not already exist.
 
@@ -3031,6 +3038,8 @@ exportSnapshot (Session session) =
 
 {- |
 Variant of 'exportSnapshot' that is specialised to 'IO' using the real filesystem.
+
+This always exports the snapshot by copying.
 -}
 exportSnapshotIO ::
     Session IO ->
