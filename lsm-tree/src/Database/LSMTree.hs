@@ -429,7 +429,7 @@ For more information about the interfaces and their instantiations, see the Hadd
 documentation of the @fs-api@, @fs-sim@, @blockio@ packages.
 
 The session directory is a relative 'FsPath' path that is interpreted relative to the /root/ of
-the given 'HasFS' and 'HasBlockio' interfaces.
+the given 'HasFS' and 'HasBlockIO' interfaces.
 If the interaces are instantiated with the real file system, then the root is an
 (absolute or relative) file path.
 In this case, the root is also called the /mount point/ of the interface.
