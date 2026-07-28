@@ -4,6 +4,7 @@ module Database.LSMTree.Internal.FS (
   , hardLinkDirectoryRecursive
     -- * Copy file
   , copyFile
+    -- * Hard links with fallback
   , hardLinkOrCopyDirectoryRecursive
   ) where
 
@@ -140,7 +141,7 @@ copyFile' sourceFS destinationFS reg sourcePath destinationPath =
           void $ FSL.hPutAll destinationFS destinationHandle bs
 
 {-------------------------------------------------------------------------------
-  Copy file
+  Hard link with fallback
 -------------------------------------------------------------------------------}
 
 {-# SPECIALISE
@@ -153,7 +154,7 @@ copyFile' sourceFS destinationFS reg sourcePath destinationPath =
     -> IO ()
   #-}
 -- | @'hardLinkOrCopy' sourceFS destinationFS hbio reg sourcePath destinationPath@
---   attemtps to create a hard link from @sourcePath@ to @destinationPath@, if
+--   attemtps to create a hard link from @sourcePath@ to @destinationPath@ if
 --   both are on the same file system and copies the file otherwise.
 hardLinkOrCopy ::
   (MonadMask m, PrimMonad m)
