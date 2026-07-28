@@ -53,8 +53,9 @@ newtype Value = Value Word64
 prop_exportImportSnapshot ::
      V.Vector (Key, Value)
   -> V.Vector Key
+  -> Bool -- ^ Should hard link?
   -> Property
-prop_exportImportSnapshot ins los =
+prop_exportImportSnapshot ins los shouldHardLink =
     checkCoverage $
     ioProperty $
     withTempIOHasBlockIO "prop_exportImportSnapshot" $ \hfs hbio -> do
@@ -67,8 +68,9 @@ prop_exportImportSnapshot ins los =
           saveSnapshot "snap1" "KeyValueBlob" table1
 
           -- Export then re-import the snapshot
-          exportSnapshot session "snap1" (Nothing, exportDir)
-          importSnapshot session "snap2" (Nothing, exportDir)
+          let maybeFS = if shouldHardLink then Nothing else Just hfs
+          exportSnapshot session "snap1" (maybeFS, exportDir)
+          importSnapshot session "snap2" (maybeFS, exportDir)
 
           -- Open a table from the re-imported snapshot. Any corruption of the
           -- snapshot would be identified here.
