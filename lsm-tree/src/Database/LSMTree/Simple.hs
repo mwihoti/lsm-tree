@@ -1567,11 +1567,6 @@ listSnapshots (Session session) =
 {- |
 Import a snapshot from an external directory.
 
-If the source directory is on a different filesystem from the session
-directory, it should be passed as a pair of the `HasFS` instance for that
-filesystem and an `FsPath`. If the source directory is on the same
-filesystem as the session directory, the `HasFS` instance may be omitted.
-
 The source directory should exist.
 
 The worst-case disk I\/O complexity of this operation is \(O(\frac{n}{P})\).
