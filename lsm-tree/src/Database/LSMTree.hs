@@ -489,6 +489,11 @@ withOpenSession tracer hasFS hasBlockIO sessionSalt sessionDir action = do
 
 {- |
 Variant of 'withOpenSession' that is specialised to 'IO' using the real filesystem.
+
+__Warning:__ When using this function, the interface root becomes the session
+directory itself. If `importSnapshot`/`exportSnapshot` are used with an `FsPath`
+/without/ an `HasFS` instance, the `FsPath` is interpreted relative to the session
+directory, which may interfere with database operation.
 -}
 withOpenSessionIO ::
   Tracer IO LSMTreeTrace ->
