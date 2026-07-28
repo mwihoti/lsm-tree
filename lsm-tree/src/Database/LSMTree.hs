@@ -2899,6 +2899,9 @@ by copying. If the source directory is on the same filesystem as the session
 directory, the `HasFS` instance may be omitted. In this case, the snapshot
 is imported by hard linking, only falling back to copying if that fails.
 
+Importing does not that whether the external directory is a valid shnapshot.
+Open the imported snapshot to verify that it is a valid and uncorrupted.
+
 The source directory should exist.
 
 >>> :{
