@@ -2965,10 +2965,10 @@ importSnapshotIO ::
     IO ()
 importSnapshotIO session snapshotName importDir = do
   -- Get the absolute path to the export directory.
-  exportAbsDir <- Dir.makeAbsolute importDir
+  importAbsDir <- Dir.makeAbsolute importDir
 
   -- Split the path to the export directory to determine a suitable mount point.
-  let (mountPointPath, importRelDir) = FP.splitFileName exportAbsDir
+  let (mountPointPath, importRelDir) = FP.splitFileName importAbsDir
   let mountPoint = MountPoint mountPointPath
   let importDirFsPath = mkFsPath [importRelDir]
 
