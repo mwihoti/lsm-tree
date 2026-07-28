@@ -511,7 +511,7 @@ The session directory is an 'FsPath' path that is interpreted relative to the gi
 Any 'FsPath' paths used with the session after the session is created are also interpreted
 with respect to the mount point.
 'importSnapshot' and 'exportSnapshot' are currently the only two functions that take
-'FsPaths' as arguments.
+'FsPath's as arguments.
 'FsPath's are subject to a number of constraints, which are mentioned in its haddock documentation.
 -}
 withOpenMountedSessionIO ::
