@@ -1565,7 +1565,7 @@ listSnapshots (Session session) =
     LSMT.listSnapshots session
 
 {- |
-Import a snapshot from an external directory.
+Import a snapshot from an external directory by copying.
 
 The source directory should exist.
 
@@ -1591,7 +1591,7 @@ importSnapshot (Session session) snapshotName importDir =
 
 
 {- |
-Export a snapshot to a directory.
+Export a snapshot to a directory by copying.
 
 The destination directory should not already exist.
 
