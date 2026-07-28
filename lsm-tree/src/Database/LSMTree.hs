@@ -436,8 +436,7 @@ In this case, the root is also called the /mount point/ of the interface.
 If the interfaces are instantiated with a simulation, then the root is some abstract location.
 
 If the 'FsPath' argument to 'importSnapshot' or 'exportSnapshot' is passed without the optional
-'HasFS' instance, these 'FsPath' paths are interpreted with respected to the 'HasFS' instance
-that was passed to /this/ function.
+'HasFS' instance, these 'FsPath' paths are interpreted with respected to the interface root.
 
 If there are no open tables or cursors when the session terminates, then the disk I\/O complexity of this operation is \(O(1)\).
 Otherwise, 'closeTable' is called for each open table and 'closeCursor' is called for each open cursor.
