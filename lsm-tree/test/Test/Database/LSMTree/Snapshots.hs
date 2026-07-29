@@ -8,7 +8,8 @@ import qualified Data.Vector as V
 import           Data.Void (Void)
 import           Data.Word (Word64)
 import           Database.LSMTree (ResolveValue, Salt, SerialiseKey,
-                     SerialiseValue, Table, TableConfig (confWriteBufferAlloc),
+                     SerialiseValue, SnapshotMode (..), Table,
+                     TableConfig (confWriteBufferAlloc),
                      WriteBufferAlloc (AllocNumEntries), defaultTableConfig,
                      exportSnapshot, getValue, importSnapshot, inserts, lookups,
                      saveSnapshot, withOpenSession, withTableFromSnapshot,
@@ -68,9 +69,9 @@ prop_exportImportSnapshot ins los shouldHardLink =
           saveSnapshot "snap1" "KeyValueBlob" table1
 
           -- Export then re-import the snapshot
-          let maybeFS = if shouldHardLink then Nothing else Just hfs
-          exportSnapshot session "snap1" (maybeFS, exportDir)
-          importSnapshot session "snap2" (maybeFS, exportDir)
+          let mode = if shouldHardLink then HardLink False else Copy hfs
+          exportSnapshot session "snap1" mode exportDir
+          importSnapshot session "snap2" mode exportDir
 
           -- Open a table from the re-imported snapshot. Any corruption of the
           -- snapshot would be identified here.

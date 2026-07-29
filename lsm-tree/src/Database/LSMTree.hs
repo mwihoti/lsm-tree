@@ -2995,8 +2995,8 @@ runExample $ \session table -> do
   LSMT.saveSnapshot "example" "Key Value Blob" table
   -- Export then import snapshot
   let exportDir = mkFsPath ["export"]
-  LSMT.exportSnapshot session "example" (Nothing, exportDir)
-  LSMT.importSnapshot session "example_new" (Nothing, exportDir)
+  LSMT.exportSnapshot session "example" (HardLink True) exportDir
+  LSMT.importSnapshot session "example_new" (HardLink True) exportDir
   -- Open the imported snapshot
   LSMT.withTableFromSnapshot @_ @_ @Value
     session "example_new" "Key Value Blob" $ \table' -> do
