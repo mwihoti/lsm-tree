@@ -168,9 +168,17 @@ data Mode m h
     -> FS.FsPath
     -> IO ()
   #-}
--- | @'hardLinkOrCopy' sourceFS destinationFS hbio reg sourcePath destinationPath@
---   attemtps to create a hard link from @sourcePath@ to @destinationPath@ if
---   both are on the same file system and copies the file otherwise.
+-- | @'hardLinkOrCopy' sourceFS mode hbio reg sourcePath destinationPath@
+--   attempts to create a hard link or create a copy from @sourcePath@ to
+--   @destinationPath@ depending on the @mode@
+--
+-- If @mode = HardLink b hbio@, then this functions attemtps to create a hard
+-- link from @sourcePath@ to @destinationPath@ if both are on the same file
+-- system and copies the file otherwise (if @b == True@).
+--
+-- If @mode = Copy destinationFS@, then this function copies from @sourcePath@
+-- to @destinationPath@, where the latter is interpreted with respect to
+-- @destinationFS@
 hardLinkOrCopy ::
   (MonadMask m, PrimMonad m)
   => -- | The 'HasFS' instance for the source filesystem

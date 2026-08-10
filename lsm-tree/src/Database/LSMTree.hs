@@ -205,7 +205,6 @@ import           Control.Concurrent.Class.MonadMVar.Strict (MonadMVar)
 import           Control.Concurrent.Class.MonadSTM (MonadSTM (STM))
 import           Control.DeepSeq (NFData (..))
 import           Control.Exception.Base (assert)
-import           Control.Monad (when)
 import           Control.Monad.Class.MonadAsync (MonadAsync)
 import           Control.Monad.Class.MonadST (MonadST)
 import           Control.Monad.Class.MonadThrow (MonadCatch (..), MonadEvaluate,
@@ -268,9 +267,7 @@ import           Database.LSMTree.Internal.Unsafe (BlobRefInvalidError (..),
 import qualified Database.LSMTree.Internal.Unsafe as Internal
 import           Prelude hiding (lookup, take, takeWhile)
 import qualified System.Directory as Dir
-import qualified System.FilePath as FP
-import           System.FS.API (FsErrorPath (..), FsPath, HasFS (..),
-                     MountPoint (..), mkFsPath)
+import           System.FS.API (FsPath, HasFS (..), MountPoint (..), mkFsPath)
 import           System.FS.BlockIO.API (HasBlockIO (..))
 import           System.FS.BlockIO.IO (defaultIOCtxParams, withIOHasBlockIO)
 import           System.FS.IO (HandleIO, ioHasFS)
@@ -493,7 +490,7 @@ Variant of 'withOpenSession' that is specialised to 'IO' using the real filesyst
 
 __Warning:__ When using this function, the interface root becomes the session
 directory itself. If 'importSnapshot' or 'exportSnapshot' are passed the
-'SnapshotMode' 'HardLink', the 'FsPath' path is interpreted with relative to the
+'SnapshotMode' 'HardLink', the 'FsPath' path is interpreted relative to the
 session directory, which may interfere with database operations.
 -}
 withOpenSessionIO ::
@@ -2896,8 +2893,8 @@ flag determines whether the import should fall back to copying if hard linking
 fails. If the 'SnapshotMode' is @'Copy' extFS@, the 'FsPath' is interpreted
 relative to the root of the @extFS@ 'HasFS' interface.
 
-Importing does not that whether the external directory is a valid shnapshot.
-Open the imported snapshot to verify that it is a valid and uncorrupted.
+Importing does not not check whether the external directory is a valid snapshot.
+Open the imported snapshot to verify that it is valid and uncorrupted.
 
 The source directory should exist.
 
@@ -2923,7 +2920,7 @@ Found (Value "World")
 The worst-case disk I\/O complexity of this operation depends on the merge policy of the table:
 
 ['LazyLevelling']:
-    \(O(T \log_T \frac{n}{B})\).
+    \(O(T \log_T \frac{n}{P})\).
 
 Throws the following exceptions:
 
@@ -2967,10 +2964,8 @@ importSnapshotIO session snapshotName importDir = do
   -- Get the absolute path to the export directory.
   importAbsDir <- Dir.makeAbsolute importDir
 
-  -- Split the path to the export directory to determine a suitable mount point.
-  let (mountPointPath, importRelDir) = FP.splitFileName importAbsDir
-  let mountPoint = MountPoint mountPointPath
-  let importDirFsPath = mkFsPath [importRelDir]
+  let mountPoint = MountPoint importAbsDir
+  let importDirFsPath = mkFsPath []
 
   -- Import the snapshot.
   importSnapshot session snapshotName (Copy (ioHasFS @IO mountPoint)) importDirFsPath
@@ -3009,7 +3004,7 @@ Found (Value "World")
 The worst-case disk I\/O complexity of this operation depends on the merge policy of the table:
 
 ['LazyLevelling']:
-    \(O(T \log_T \frac{n}{B})\).
+    \(O(T \log_T \frac{n}{P})\).
 
 Throws the following exceptions:
 
@@ -3054,15 +3049,8 @@ exportSnapshotIO session snapshotName exportDir = do
   exportAbsDir <- Dir.makeAbsolute exportDir
 
   -- Split the path to the export directory to determine a suitable mount point.
-  let (mountPointPath, exportRelDir) = FP.splitFileName exportAbsDir
-  let mountPoint = MountPoint mountPointPath
-  let exportDirFsPath = mkFsPath [exportRelDir]
-
-  -- NOTE: If exportRelDir is null, then exportAbsDir must be the root
-  --       directory, which, it is fair to assume, exists.
-  when (null exportRelDir) $ do
-    let exportFsErrorPath = FsErrorPath (Just mountPoint) exportDirFsPath
-    throwIO $ ErrSnapshotExportDirExists exportFsErrorPath
+  let mountPoint = MountPoint exportAbsDir
+  let exportDirFsPath = mkFsPath []
 
   -- Export the snapshot.
   exportSnapshot session snapshotName (Copy (ioHasFS @IO mountPoint)) exportDirFsPath
