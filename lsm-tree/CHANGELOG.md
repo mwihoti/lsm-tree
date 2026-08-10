@@ -1,5 +1,49 @@
 # Revision history for `lsm-tree`
 
+## ?.?.?.? -- ????-??-??
+
+### Breaking changes
+
+* The constructor for `SnapshotImportDirDoesNotExistError` was renamed to
+  `ErrSnapshotImportDirDoesNotExist` and its field is now of type `FsErrorPath`.
+* The constructor for `SnapshotExportDirExistsError` was renamed to
+  `ErrSnapshotExportDirExists`  and its field is now of type `FsErrorPath`.
+* `importSnapshot` and `exportSnapshot` have a new `SnapshotMode` argument that
+  determines whether the snapshot is imported/exported by hard linking or
+  copying. If the `SnapshotMode` is `HardLink fallback`, the `FsPath` is
+  interpreted relative to the session's *interface root* (see haddocks). The
+  `fallback` flag determines whether the import/export should fall back to
+  copying if hard linking fails. If the `SnapshotMode` is `Copy extFS`, the
+  `FsPath` is interpreted relative to the root of the `extFS` `HasFS` interface.
+
+### New features
+
+#### Full API
+
+* Add a new `importSnapshotIO` function that imports snapshots from disk by
+  using a `FilePath` path. This function always copies rather than hard linking.
+* Add a new `exportSnapshotIO` function that exports snapshots to disk using a
+  `FilePath` path. This function always copies rather than hard linking.
+
+#### Simple API
+
+* Add a new `importSnapshot` function that imports snapshots from disk using a
+  `FilePath` path and a variant of `SnapshotImportDirDoesNotExistError` with a
+  `FilePath` field. This function always copies rather than hard linking.
+* Add a new `exportSnapshot` function that exports snapshots to disk using a
+  `FilePath` path and a variant of `SnapshotExportDirExistsError` with a
+  `FilePath` field. This function always copies rather than hard linking.
+
+### Minor changes
+
+* Revert the deprecation of `withOpenSessionIO`, since the other changes in this
+  version have made it safe to use with `importSnapshot` and `exportSnapshot`.
+
+### Bug fixes
+
+* If a `SnapshotExportDirExistsError` is thrown, this now contains the
+  destination directory, rather than the directory of the internal snapshot.
+
 ## 1.1.1.0 -- 2026-07-21
 
 ### Breaking changes

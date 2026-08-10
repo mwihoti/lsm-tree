@@ -8,7 +8,8 @@ import qualified Data.Vector as V
 import           Data.Void (Void)
 import           Data.Word (Word64)
 import           Database.LSMTree (ResolveValue, Salt, SerialiseKey,
-                     SerialiseValue, Table, TableConfig (confWriteBufferAlloc),
+                     SerialiseValue, SnapshotMode (..), Table,
+                     TableConfig (confWriteBufferAlloc),
                      WriteBufferAlloc (AllocNumEntries), defaultTableConfig,
                      exportSnapshot, getValue, importSnapshot, inserts, lookups,
                      saveSnapshot, withOpenSession, withTableFromSnapshot,
@@ -53,8 +54,9 @@ newtype Value = Value Word64
 prop_exportImportSnapshot ::
      V.Vector (Key, Value)
   -> V.Vector Key
+  -> Bool -- ^ Should hard link?
   -> Property
-prop_exportImportSnapshot ins los =
+prop_exportImportSnapshot ins los shouldHardLink =
     checkCoverage $
     ioProperty $
     withTempIOHasBlockIO "prop_exportImportSnapshot" $ \hfs hbio -> do
@@ -67,8 +69,9 @@ prop_exportImportSnapshot ins los =
           saveSnapshot "snap1" "KeyValueBlob" table1
 
           -- Export then re-import the snapshot
-          exportSnapshot session "snap1" exportDir
-          importSnapshot session "snap2" exportDir
+          let mode = if shouldHardLink then HardLink False else Copy hfs
+          exportSnapshot session "snap1" mode exportDir
+          importSnapshot session "snap2" mode exportDir
 
           -- Open a table from the re-imported snapshot. Any corruption of the
           -- snapshot would be identified here.
