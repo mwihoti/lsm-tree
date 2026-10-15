@@ -61,6 +61,27 @@ tests = testGroup "blockio:test" [
         prop_synchroniseFile_fileDoesNotExist
     , testProperty "prop_synchroniseDirectory_directoryDoesNotExist"
         prop_synchroniseDirectory_directoryDoesNotExist
+    , testProperty "prop_hysynchronise" prop_hysynchronise
+    , testProperty "prop_synchroniseDirectoryRecursive"
+        prop_synchroniseDirectoryRecursive
+
+      -- submitIO batches
+    , testProperty "prop_submitIO_batch" prop_submitIO_batch
+    , testProperty "prop_submitIO_multipleHandles" prop_submitIO_multipleHandles
+    , testProperty "prop_submitIO_emptyBatch" prop_submitIO_emptyBatch
+
+      -- File data caching, advice, allocation
+    , testProperty "prop_hSetNoCache" prop_hSetNoCache
+    , testProperty "prop_hAdvise" prop_hAdvise
+    , testProperty "prop_hDropCacheAll" prop_hDropCacheAll
+    , testProperty "prop_hAllocate" prop_hAllocate
+
+      -- File locks
+    , testProperty "prop_tryLockFileTwice" prop_tryLockFileTwice
+    , testProperty "prop_tryLockFile_unlockRelock" prop_tryLockFile_unlockRelock
+
+      -- Hard links
+    , testProperty "prop_createHardLink" prop_createHardLink
     ]
 
 instance Arbitrary ByteString where
@@ -231,9 +252,76 @@ isNotPinnedError e
   | otherwise
   = False
 
-{-------------------------------------------------------------------------------
-  File locks
--------------------------------------------------------------------------------}
+  {-------------------------------------------------------------------------------
+    File locks
+  -------------------------------------------------------------------------------}
+
+  {-------------------------------------------------------------------------------
+    submitIO batches
+  -------------------------------------------------------------------------------}
+
+-- | Write a batch of chunks back to back into a file using a single 'submitIO', read them back
+-- back using a single 'submitIO', and check that results correspond pair-wise to the input 'IOOp's.
+prop_submitIO_batch :: [ByteString] -> Property
+prop_submitIO_batch bss =
+    ioProperty $
+    withTempIOHasBlockIO "prop_submitIO_batch" $ \hfs hbio ->
+    FS.withFile hfs path (FS.ReadWriteMode FS.MustBeNew) $ \h -> do
+      let lens = map BS.length bss
+        offs = scan1 (+) 0 lens
+      writeBufs <- traverse fromByteStringPinned bss
+      writeRes <- submitIO hbio $ V.fromList
+         [ IOOpWrite h (fromIntegral off) buf 0 (fromIntegral n)
+         | (off, buf, n) <- zip3 offs writeBufs lens ]
+      let writeTest = VU.toList writeRes == [ IOResult (fromIntegral n) | n <- lens ]
+      readBufs <- traverse newPinnedByteArray lens
+      readRes <- submitIO hbio $ V.fromList
+         [ IOOpRead h (fromIntegral off) buf 0 (fromIntegral n)
+         | (off, buf, n) <- zip3 offs readBufs lens ]
+      let readTest = VU.toList readRes == VU.toList writeRes
+      bss' <- sequence [ toByteString n buf | (n, buf) <- zip lens readBufs ]
+      pure $ writeTest .&&. readTest .&&. (bss == bss')
+  where
+    path = FS.mKFsPath ["temp-file"]
+
+-- | A single 'submitIO' batch may mix operations on different file handles.
+prop_submitIO_multipleHandles :: ByteString -> ByteString -> Property
+prop_submitIO_multipleHandles bs1 bs2 =
+    ioProperty $
+    withTempIOHasBlockIO "prop_submitIO_multipleHandles" $ \hfs hbio ->
+    FS.withFile hfs path1 (FS.ReadwriteMode Fs.MustBeNew) $ \h1 ->
+    FS.withFile hfs path2 (FS.ReadWriteMode FS.MustBeNew) $ \h2 -> do
+      writeBuf1 <- fromByteStringPinned bs1
+      writeBuf2 <- fromByteStringPinned bs2
+      _ <- submitIO hbio $ V.fromList
+        [ IOOpWrite h1 0 writeBuf1 0 (fromIntegral (BS.length bs1))
+        , IOOpWrite h2 0 writeBuf2 0 (fromIntegral (BS.length bs2)) ]
+      bs1' <- toByteString (BS.length bs1) readBuf1
+      bs2' <- toByteString (BS.length bs2) readBuf2
+      pure $ bs1 == bs1' .&&. bs2 == bs2'
+  where
+    path1 = FS.mkFsPath ["temp-file-1"]
+    path2 = FS.mkFsPath ["temp-file-2"]
+
+-- | Submitting an empty batch succeeds and returns no results.
+prop_submitIO_emptyBatch :: Property
+prop_submitIO_emptyBatch =
+ioProperty $
+withTempIOHasBlockIO "prop_submitIO_emptyBatch" $ \_hfs hbio -> do
+  res <- submitIO hbio V.empty
+  pure $ VU.toList res == []
+
+  {-------------------------------------------------------------------------------
+    File data caching, advice, allocation
+  -------------------------------------------------------------------------------}
+
+  -- | Toggling 'hSetNoCache' does not throw, and reads/writes still work
+  -- correctly after the file data caching mode is restored.
+  --
+  -- Note: this is a no-op on Windows, and the no-cache mode has buffer alignment
+  -- requirements on Linux, so we only perform I/O while caching is (re)enabled.
+
+
 
 withTempIOHasBlockIO :: FilePath -> (HasFS IO HandleIO -> HasBlockIO IO HandleIO -> IO a) -> IO a
 withTempIOHasBlockIO path action = withSystemTempDirectory path $ \dir -> do
